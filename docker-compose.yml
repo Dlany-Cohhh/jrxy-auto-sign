@@ -1,0 +1,20 @@
+services:
+  jrxy-sign:
+    build: .
+    image: jrxy-sign:latest
+    container_name: jrxy-sign
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      SIGN_TIME: "22:05"
+      AUTO_SIGN: "1"
+      # 对外部署强烈建议设置访问令牌，例如：WEB_TOKEN: "change-me-strong-token"
+      WEB_TOKEN: ""
+    volumes:
+      - jrxy-sign-data:/app/web-server/data
+
+volumes:
+  jrxy-sign-data:

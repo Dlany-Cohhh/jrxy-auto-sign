@@ -1,0 +1,27 @@
+# ===== 敏感配置（严禁提交）=====
+jrxyzuixingnx/config.yml
+jrxyzuixingnx/device_id.txt
+jrxyzuixingnx/.device_id
+jrxyzuixingnx/*.log
+jrxyzuixingnx/aes_test*.txt
+*.log
+
+# ===== 虚拟环境 / 运行时数据 =====
+.venv/
+venv/
+__pycache__/
+*.pyc
+web-server/data/
+web-server/.venv/
+jrxyzuixingnx/.venv/
+auto-sign/
+
+# ===== 系统/编辑器 =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ===== 本地敏感记录与预览图（不上传）=====
+服务器部署记录-UFI001C.md
+web-ui-*.png

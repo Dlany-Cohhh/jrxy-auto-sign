@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日校园自动签到 · 管理台</title>
+<link rel="stylesheet" href="https://cdn.staticfile.org/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --card2:#243349; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --ok:#10b981; --warn:#f59e0b;
+    --bad:#f43f5e; --info:#38bdf8; --btn:#334155; --btn-hover:#475569;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.6; padding:24px;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;background:var(--card);border:1px solid var(--line);
+    border-radius:12px;margin-bottom:20px;
+  }
+  header h1{font-size:18px;font-weight:600}
+  header .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card2)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .dot.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+  .dot.off{background:var(--bad)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card .k{color:var(--muted);font-size:12px}
+  .card .v{font-size:16px;font-weight:600;margin-top:4px;word-break:break-all}
+  .card .v.small{font-size:13px;font-family:Consolas,Menlo,monospace}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:20px}
+  .panel h2{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .panel h2 .tag{font-size:11px;color:var(--muted);font-weight:400}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;color:var(--muted)}
+  input[type=text],input[type=number],input[type=time],input[type=password]{
+    background:var(--card2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:9px 12px;font-size:14px;min-width:180px;outline:none;
+  }
+  input:focus{border-color:var(--info)}
+  button{
+    background:var(--btn);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;transition:background .15s;
+  }
+  button:hover{background:var(--btn-hover)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--ok);border-color:var(--ok);color:#04140c;font-weight:600}
+  button.primary:hover{background:#34d399}
+  button.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+  button.ghost{background:transparent}
+  .result{
+    margin-top:14px;border-radius:10px;padding:12px 16px;font-size:13px;display:none;
+    border:1px solid var(--line);white-space:pre-wrap;word-break:break-all;
+    max-height:260px;overflow:auto;font-family:Consolas,Menlo,monospace;
+  }
+  .result.show{display:block}
+  .result.ok{border-color:var(--ok);background:rgba(16,185,129,.08);color:#a7f3d0}
+  .result.warn{border-color:var(--warn);background:rgba(245,158,11,.08);color:#fde68a}
+  .result.bad{border-color:var(--bad);background:rgba(244,63,94,.08);color:#fecdd3}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  td.detail{color:var(--muted);max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tbl-scroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .pill{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--line)}
+  .pill.ok{color:#a7f3d0;border-color:var(--ok)}
+  .pill.warn{color:#fde68a;border-color:var(--warn)}
+  .pill.bad{color:#fecdd3;border-color:var(--bad)}
+  .pill.def{color:var(--muted)}
+  footer{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}
+  .toast{
+    position:fixed;top:20px;right:20px;z-index:999;padding:10px 16px;border-radius:8px;
+    font-size:13px;border:1px solid var(--line);background:var(--card2);box-shadow:0 8px 24px rgba(0,0,0,.35);
+    transform:translateX(120%);transition:transform .25s;max-width:360px;
+  }
+  .toast.show{transform:translateX(0)}
+  .toast.ok{border-color:var(--ok)} .toast.bad{border-color:var(--bad)}
+  .mask{
+    position:fixed;inset:0;background:rgba(2,6,23,.75);display:none;align-items:center;justify-content:center;z-index:50;
+  }
+  .mask.show{display:flex}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 28px;width:min(400px,90vw)}
+  .modal h3{font-size:16px;margin-bottom:10px}
+  .modal p{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .mapbox{margin-top:14px;display:none}
+  .mapbox.show{display:block}
+  #map{height:380px;border-radius:10px;border:1px solid var(--line);z-index:1}
+  .mapbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .mapbar input{flex:1;min-width:220px}
+  .hint{color:var(--muted);font-size:12px;margin-top:8px;word-break:break-all}
+  .leaflet-container{background:#0b1220}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>今日校园自动签到 · 管理台</h1>
+      <div class="sub">今日校园查寝/签到 · Web 管理界面</div>
+    </div>
+    <div class="badge" id="platformBadge"><span class="dot off" id="engineDot"></span><span id="engineText">连接中…</span></div>
+  </header>
+
+  <div class="cards" id="overviewCards">
+    <div class="card"><div class="k">学校</div><div class="v" id="cSchool">-</div></div>
+    <div class="card"><div class="k">账号</div><div class="v" id="cUser">-</div></div>
+    <div class="card"><div class="k">任务类型</div><div class="v" id="cType">-</div></div>
+    <div class="card"><div class="k">设备 ID（勿更换）</div><div class="v small" id="cDev">-</div></div>
+    <div class="card"><div class="k">当前坐标（GCJ-02）</div><div class="v small" id="cCoord">-</div></div>
+    <div class="card"><div class="k">内置定时</div><div class="v small" id="cSched">-</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>手动操作 <span class="tag">dry 只探测不提交；submit 会真实完成一次查寝签到</span></h2>
+    <div class="row">
+      <button class="ghost" id="btnDry" onclick="run('dry')">只探测（无副作用）</button>
+      <button class="primary" id="btnSubmit" onclick="run('submit')">立即签到（真实提交）</button>
+      <button class="ghost" onclick="refreshAll()">刷新状态</button>
+    </div>
+    <div class="result" id="resultBox"></div>
+  </div>
+
+  <div class="panel">
+    <h2>坐标与地址 <span class="tag">保存后写入 data/override.json 立即生效（含定时任务）· 地图选点：高德瓦片 GCJ-02 直接可用，不可达时自动回退 OpenStreetMap</span></h2>
+    <div class="row">
+      <div class="field"><label>经度 lon（GCJ-02）</label><input type="number" step="0.000001" id="inLon"></div>
+      <div class="field"><label>纬度 lat（GCJ-02）</label><input type="number" step="0.000001" id="inLat"></div>
+      <div class="field"><label>定位地址文本</label><input type="text" id="inAddr" style="min-width:300px"></div>
+      <button class="primary" onclick="saveConfig()">保存坐标</button>
+      <button class="ghost" onclick="toggleMap()">🗺 地图选点</button>
+    </div>
+    <div class="mapbox" id="mapbox">
+      <div class="mapbar">
+        <input type="text" id="mapSearch" placeholder="搜索地址，如：韩山师范学院南三区 C 栋">
+        <button onclick="mapSearchGo()">搜索</button>
+        <button class="ghost" onclick="useMyLoc()">📍 使用我的定位</button>
+        <button class="ghost" onclick="toggleMap()">收起地图</button>
+      </div>
+      <div id="map"></div>
+      <div class="hint" id="mapHint">提示：在地图上点击或拖动标记选点；高德瓦片坐标为 GCJ-02（与今日校园一致），选点自动回填上方经纬度，可手动微调后保存。</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>内置定时签到 <span class="tag">服务器部署时的自足定时器（本机部署可同时保留豆包定时任务）</span></h2>
+    <div class="row">
+      <div class="field"><label>启用定时</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="inAuto" style="width:16px;height:16px"> 启用
+        </label>
+      </div>
+      <div class="field"><label>每日签到时间（HH:MM）</label><input type="time" id="inTime"></div>
+      <button class="primary" onclick="saveSchedule()">保存定时</button>
+      <span class="tag" id="nextRun"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>运行日志 <span class="tag">最近记录（最多 200 条）</span></h2>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th style="width:150px">时间</th><th style="width:110px">类型</th><th style="width:150px">结果</th><th>详情</th></tr></thead>
+        <tbody id="logBody"><tr><td colspan="4" style="text-align:center;color:var(--muted)">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>明文密码仅存于 jrxyzuixingnx/config.yml，本界面永不显示密码 · 默认仅监听本机，对外部署请设置 WEB_TOKEN</footer>
+</div>
+
+<div class="mask" id="tokenMask">
+  <div class="modal">
+    <h3>需要访问令牌</h3>
+    <p>服务端已设置 WEB_TOKEN，请输入令牌后继续。</p>
+    <input type="password" id="tokenInput" placeholder="X-Web-Token" style="width:100%;margin-bottom:14px">
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="saveToken()">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LS_KEY = "jrxy_web_token";
+let token = localStorage.getItem(LS_KEY) || "";
+const el = id => document.getElementById(id);
+
+function headers(){
+  const h = {"Content-Type":"application/json"};
+  if (token) h["X-Web-Token"] = token;
+  return h;
+}
+async function api(path, opts={}){
+  const res = await fetch(path, Object.assign({headers:headers()}, opts));
+  if (res.status === 401){
+    el("tokenMask").classList.add("show");
+    throw new Error("unauthorized");
+  }
+  if (!res.ok){
+    const d = await res.json().catch(()=>({}));
+    throw new Error(d.detail || res.statusText);
+  }
+  return res.json();
+}
+function saveToken(){
+  token = el("tokenInput").value.trim();
+  localStorage.setItem(LS_KEY, token);
+  el("tokenMask").classList.remove("show");
+  toast("令牌已保存", "ok");
+  refreshAll();
+}
+function toast(msg, kind="ok"){
+  const t = document.createElement("div");
+  t.className = "toast " + kind;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add("show"));
+  setTimeout(()=>{t.classList.remove("show"); setTimeout(()=>t.remove(),300);}, 3200);
+}
+function renderStatus(s){
+  el("cSchool").textContent = s.school || "-";
+  el("cUser").textContent = s.username || "-";
+  el("cType").textContent = {0:"收集",1:"签到",2:"查寝",3:"政工签到",4:"教师日志"}[s.type] ?? ("type="+s.type);
+  el("cDev").textContent = s.device_id || "-";
+  el("cCoord").textContent = (s.lon==null?"-":s.lon.toFixed(6)) + ", " + (s.lat==null?"-":s.lat.toFixed(6));
+  el("inLon").value = s.lon==null ? "" : s.lon;
+  el("inLat").value = s.lat==null ? "" : s.lat;
+  el("inAddr").value = s.address || "";
+  el("inAuto").checked = s.scheduler.enabled;
+  el("inTime").value = s.scheduler.time;
+  el("nextRun").textContent = s.scheduler.enabled && s.scheduler.next ? ("下次执行：" + s.scheduler.next) : "定时已停用";
+  const st = s.scheduler.enabled ? "定时运行中" : "定时已停用";
+  el("engineText").textContent = s.engine_ready ? (s.platform + " · " + st) : ("引擎环境缺失！请运行部署脚本");
+  el("engineDot").className = "dot " + (s.engine_ready ? "on" : "off");
+  el("platformBadge").title = "服务器时间 " + s.server_time;
+  syncMarkerFromInputs();
+}
+function renderLogs(logs){
+  const b = el("logBody");
+  if (!logs.length){ b.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">暂无记录</td></tr>'; return; }
+  b.innerHTML = logs.map(l=>{
+    const cls = l.result.includes("成功") ? "ok" : (l.result.includes("未开始") || l.result.includes("重复") ? "warn" : (l.result.includes("失败")||l.result.includes("异常") ? "bad" : "def"));
+    return `<tr>
+      <td>${l.ts}</td>
+      <td><span class="pill def">${l.kind}</span></td>
+      <td><span class="pill ${cls}">${l.result}</span></td>
+      <td class="detail" title="${l.detail.replace(/"/g,"&quot;")}">${l.detail}</td>
+    </tr>`;
+  }).join("");
+}
+async function refreshAll(){
+  try{
+    const s = await api("/api/status");
+    renderStatus(s);
+    const lg = await api("/api/logs?limit=50");
+    renderLogs(lg.logs);
+  }catch(e){
+    if (e.message !== "unauthorized") toast("状态加载失败：" + e.message, "bad");
+  }
+}
+async function run(mode){
+  const btn = mode==="submit" ? el("btnSubmit") : el("btnDry");
+  btn.disabled = true;
+  const old = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span>执行中…';
+  el("resultBox").className = "result show";
+  el("resultBox").textContent = "正在执行（登录→查任务→" + (mode==="submit"?"提交":"构造提交体") + "），约需 5~20 秒…";
+  try{
+    const r = await api("/api/run", {method:"POST", body:JSON.stringify({mode})});
+    const cls = r.result.includes("成功") ? "ok" : (r.result.includes("未开始") || r.result.includes("重复") ? "warn" : "bad");
+    el("resultBox").className = "result show " + cls;
+    el("resultBox").textContent = "【" + r.result + "】\n\n" + r.detail;
+    toast(r.result, cls==="ok"?"ok":"warn");
+    const lg = await api("/api/logs?limit=50");
+    renderLogs(lg.logs);
+  }catch(e){
+    if (e.message !== "unauthorized"){
+      el("resultBox").className = "result show bad";
+      el("resultBox").textContent = "执行失败：" + e.message;
+      toast("执行失败：" + e.message, "bad");
+    }
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+}
+async function saveConfig(){
+  try{
+    await api("/api/config", {method:"POST", body:JSON.stringify({
+      lon: el("inLon").value, lat: el("inLat").value, address: el("inAddr").value
+    })});
+    toast("坐标已保存并生效", "ok");
+    refreshAll();
+  }catch(e){ toast("保存失败：" + e.message, "bad"); }
+}
+async function saveSchedule(){
+  try{
+    await api("/api/schedule", {method:"POST", body:JSON.stringify({
+      enabled: el("inAuto").checked, time: el("inTime").value
+    })});
+    toast("定时设置已保存", "ok");
+    refreshAll();
+  }catch(e){ toast("保存失败：" + e.message, "bad"); }
+}
+
+/* ================= 地图选点 =================
+   瓦片优先级：高德公共瓦片（GCJ-02，与今日校园同坐标系 → 选点坐标直接可用）
+             → tileerror 时自动回退 OpenStreetMap（WGS-84 → 选点时换算 GCJ-02） */
+let map = null, marker = null, mapInitialized = false, reverseTimer = null, tileLayer = null;
+let isGcjMode = true;   // true=高德瓦片(GCJ-02)，false=OSM(WGS-84)
+let nomState = "unknown"; // nominatim 地址服务状态: unknown / ok / down（down 后本会话不再请求，避免刷屏超时）
+const NOM_TIMEOUT = 6000;
+const AMAP_URL = "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}";
+const OSM_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+function toggleMap(){
+  const box = el("mapbox");
+  box.classList.toggle("show");
+  if (box.classList.contains("show")){
+    if (!mapInitialized){
+      ensureLeaflet(()=>{ initMap(); mapInitialized = true; });
+    } else {
+      setTimeout(()=>map && map.invalidateSize(), 50);
+    }
+  }
+}
+function ensureLeaflet(cb){
+  if (window.L){ cb(); return; }
+  const s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js";
+  s.onload = cb;
+  s.onerror = ()=>toast("地图组件加载失败（CDN 不可达，请检查网络）", "bad");
+  document.head.appendChild(s);
+}
+function currentGcj(){
+  const lon = parseFloat(el("inLon").value), lat = parseFloat(el("inLat").value);
+  if (!isNaN(lon) && !isNaN(lat)) return {lon, lat};
+  return {lon:116.675613, lat:23.654200}; // 默认南三区参考坐标
+}
+function initMap(){
+  const g = currentGcj();                       // GCJ-02
+  const init = isGcjMode ? g : gcj2wgs(g.lat, g.lon);
+  map = L.map("map").setView([init.lat, init.lon], 17);
+  tileLayer = L.tileLayer(AMAP_URL, {subdomains:["1","2","3","4"], maxZoom:18, attribution:'© <a href="https://www.amap.com">高德地图</a>'});
+  tileLayer.on("tileerror", ()=>{ if (isGcjMode) switchToOsm(); });
+  tileLayer.addTo(map);
+  marker = L.marker([init.lat, init.lon], {draggable:true}).addTo(map);
+  marker.on("dragend", onPicked);
+  map.on("click", e=>{ marker.setLatLng(e.latlng); onPicked(); });
+  setTimeout(()=>map.invalidateSize(), 120);
+  updateHint();
+}
+function switchToOsm(){
+  if (tileLayer){ map.removeLayer(tileLayer); tileLayer = null; }
+  isGcjMode = false;
+  L.tileLayer(OSM_URL, {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+  syncMarkerFromInputs();
+  updateHint();
+  toast("高德瓦片不可达，已切换 OpenStreetMap（选点坐标将自动换算 GCJ-02）", "warn");
+}
+function onPicked(){
+  const p = marker.getLatLng();
+  if (isGcjMode){
+    el("inLon").value = p.lng.toFixed(6);
+    el("inLat").value = p.lat.toFixed(6);
+  } else {
+    const g = wgs2gcj(p.lat, p.lng);
+    el("inLon").value = g.lon.toFixed(6);
+    el("inLat").value = g.lat.toFixed(6);
+  }
+  reverseGeocode(p.lat, p.lng);
+  updateHint();
+}
+function syncMarkerFromInputs(){
+  if (!map || !marker) return;
+  const g = currentGcj();
+  const t = isGcjMode ? g : gcj2wgs(g.lat, g.lon);
+  marker.setLatLng([t.lat, t.lon]);
+}
+function updateHint(){
+  if (!map || !marker) return;
+  const p = marker.getLatLng();
+  if (isGcjMode){
+    el("mapHint").textContent =
+      "高德瓦片坐标为 GCJ-02（与今日校园一致，可直接使用）→ 选点坐标: " +
+      p.lat.toFixed(6) + ", " + p.lng.toFixed(6);
+  } else {
+    const g = wgs2gcj(p.lat, p.lng);
+    el("mapHint").textContent =
+      "OpenStreetMap 为 WGS-84 → 已自动换算提交坐标(GCJ-02): " +
+      g.lat.toFixed(6) + ", " + g.lon.toFixed(6);
+  }
+}
+function reverseGeocode(lat, lon){
+  if (nomState === "down") return;          // 已确认不可达，本会话不再请求
+  clearTimeout(reverseTimer);
+  reverseTimer = setTimeout(async ()=>{
+    const w = isGcjMode ? gcj2wgs(lat, lon) : {lat, lon};
+    const ctl = new AbortController();
+    const timer = setTimeout(()=>ctl.abort(), NOM_TIMEOUT);
+    try{
+      const r = await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="+w.lat+"&lon="+w.lon+"&accept-language=zh-CN", {signal: ctl.signal});
+      clearTimeout(timer);
+      const d = await r.json();
+      if (d && d.display_name){ el("inAddr").value = d.display_name; nomState = "ok"; }
+    }catch(e){
+      clearTimeout(timer);
+      if (nomState === "unknown"){
+        nomState = "down";                  // 首次失败即停用，避免反复超时刷屏
+        el("mapHint").textContent += " ｜ 地址搜索/反查服务当前网络不可达，地址请手动填写（不影响选点与保存）";
+      }
+    }
+  }, 600);
+}
+async function mapSearchGo(){
+  const q = el("mapSearch").value.trim();
+  if (!q){ toast("请输入要搜索的地址", "warn"); return; }
+  if (!map){ toast("请先展开地图", "warn"); return; }
+  if (nomState === "down"){ toast("地址搜索服务不可达：请直接在地图上点击选点，或用「我的定位」", "warn"); return; }
+  const ctl = new AbortController();
+  const timer = setTimeout(()=>ctl.abort(), NOM_TIMEOUT);
+  try{
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=zh-CN&q=" + encodeURIComponent(q), {signal: ctl.signal});
+    clearTimeout(timer);
+    const d = await r.json();
+    if (!d || !d.length){ toast("未找到该地址，换个关键词试试", "warn"); return; }
+    const it = d[0];
+    const w = {lat: parseFloat(it.lat), lon: parseFloat(it.lon)};      // Nominatim 返回 WGS-84
+    const t = isGcjMode ? wgs2gcj(w.lat, w.lon) : w;
+    map.setView([t.lat, t.lon], 17);
+    marker.setLatLng([t.lat, t.lon]);
+    el("inAddr").value = it.display_name || q;
+    onPicked();
+    toast("已定位：" + (it.display_name || q), "ok");
+  }catch(e){
+    clearTimeout(timer);
+    nomState = "down";
+    el("mapHint").textContent += " ｜ 地址搜索服务当前网络不可达，请直接在地图上点击选点";
+    toast("地址搜索服务不可达（可在地图上直接点击选点）", "bad");
+  }
+}
+function useMyLoc(){
+  if (!navigator.geolocation){ toast("当前浏览器不支持定位", "bad"); return; }
+  if (!map){ toast("请先展开地图", "warn"); return; }
+  toast("正在获取定位…", "ok");
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const w = {lat: pos.coords.latitude, lon: pos.coords.longitude};   // 浏览器定位为 WGS-84
+    const t = isGcjMode ? wgs2gcj(w.lat, w.lon) : w;
+    map.setView([t.lat, t.lon], 17);
+    marker.setLatLng([t.lat, t.lon]);
+    onPicked();
+    toast("已使用当前定位", "ok");
+  }, err=>{
+    toast("定位失败：" + err.message, "bad");
+  }, {enableHighAccuracy:true, timeout:8000});
+}
+
+/* ===== WGS-84 ⇄ GCJ-02 换算（标准算法，中国境内加密偏移） ===== */
+const GCJ_A = 6378245.0, GCJ_EE = 0.00669342162296594323;
+function outOfChina(lat, lon){ return lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271; }
+function _tLat(x, y){
+  let ret = -100.0 + 2.0*x + 3.0*y + 0.2*y*y + 0.1*x*y + 0.2*Math.sqrt(Math.abs(x));
+  ret += (20.0*Math.sin(6.0*x*Math.PI) + 20.0*Math.sin(2.0*x*Math.PI)) * 2.0/3.0;
+  ret += (20.0*Math.sin(y*Math.PI) + 40.0*Math.sin(y/3.0*Math.PI)) * 2.0/3.0;
+  ret += (160.0*Math.sin(y/12.0*Math.PI) + 320.0*Math.sin(y*Math.PI/30.0)) * 2.0/3.0;
+  return ret;
+}
+function _tLon(x, y){
+  let ret = 300.0 + x + 2.0*y + 0.1*x*x + 0.1*x*y + 0.1*Math.sqrt(Math.abs(x));
+  ret += (20.0*Math.sin(6.0*x*Math.PI) + 20.0*Math.sin(2.0*x*Math.PI)) * 2.0/3.0;
+  ret += (20.0*Math.sin(x*Math.PI) + 40.0*Math.sin(x/3.0*Math.PI)) * 2.0/3.0;
+  ret += (150.0*Math.sin(x/12.0*Math.PI) + 300.0*Math.sin(x/30.0*Math.PI)) * 2.0/3.0;
+  return ret;
+}
+function wgs2gcj(lat, lon){
+  if (outOfChina(lat, lon)) return {lat, lon};
+  let dLat = _tLat(lon-105.0, lat-35.0), dLon = _tLon(lon-105.0, lat-35.0);
+  const radLat = lat/180.0*Math.PI;
+  let magic = Math.sin(radLat); magic = 1 - GCJ_EE*magic*magic;
+  const sqrtMagic = Math.sqrt(magic);
+  dLat = (dLat*180.0) / ((GCJ_A*(1-GCJ_EE)) / (magic*sqrtMagic) * Math.PI);
+  dLon = (dLon*180.0) / (GCJ_A/sqrtMagic * Math.cos(radLat) * Math.PI);
+  return {lat: lat+dLat, lon: lon+dLon};
+}
+function gcj2wgs(lat, lon){
+  const g = wgs2gcj(lat, lon);
+  return {lat: lat*2 - g.lat, lon: lon*2 - g.lon};
+}
+
+/* ================= 启动 ================= */
+refreshAll();
+if (location.hash === "#map") setTimeout(toggleMap, 600);
+setInterval(()=>{ api("/api/status").then(renderStatus).catch(()=>{}); }, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+[Unit]
+Description=Today Campus Auto Sign Web (今日校园自动签到)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/jrxy-sign/web-server
+ExecStart=/opt/jrxy-sign/web-server/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+# 安全：以非特权用户运行（install_linux.sh 会自动创建该用户并 chown 项目目录；
+# 若手动安装，请先执行: useradd -r -s /usr/sbin/nologin www-data && chown -R www-data:www-data /opt/jrxy-sign）
+User=www-data
+Group=www-data
+# 对外部署建议设置令牌（与 README 中的环境变量一致）
+Environment=HOST=127.0.0.1
+Environment=PORT=8000
+Environment=SIGN_TIME=22:05
+Environment=AUTO_SIGN=1
+# Environment=WEB_TOKEN=change-me-strong-token
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+requests==2.25.1
+requests_toolbelt==0.9.1
+tencentcloud_sdk_python>=3.0.351
+urllib3==1.26.20
+beautifulsoup4==4.9.3
+pycryptodome==3.10.1
+pyDes==2.0.1
+PyYAML>=6.0
+rsa==4.7.2
+apprise>=0.9.7
+# 可选：图形验证码 OCR（懒加载，默认 CLOUD 登录无需验证码可不装；
+# 内存紧张设备（如 512MB 随身WiFi）安装会 OOM，请保持注释）
+# ddddocr>=1.5.6

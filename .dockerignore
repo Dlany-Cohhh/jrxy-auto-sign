@@ -1,0 +1,12 @@
+# 构建上下文排除项（Docker 镜像瘦身 + 防泄漏）
+auto-sign/
+jrxyzuixingnx/.venv/
+jrxyzuixingnx/*.log
+jrxyzuixingnx/.git/
+web-server/.venv/
+web-server/data/
+web-server/__pycache__/
+deploy/
+*.log
+.git/
+.gitignore
