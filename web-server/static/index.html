@@ -64,6 +64,7 @@
   .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
   .dot.on{background:var(--ac2);box-shadow:0 0 10px rgba(34,197,94,.75)}
   .dot.off{background:var(--bad);box-shadow:0 0 8px rgba(251,93,116,.6)}
+  .badge.clock{font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;color:var(--text);letter-spacing:.4px;font-variant-numeric:tabular-nums}
 
   /* ===== 概览卡片 ===== */
   .cards{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:20px}
@@ -204,6 +205,7 @@
       </div>
     </div>
     <div class="badge" id="platformBadge"><span class="dot off" id="engineDot"></span><span id="engineText">连接中…</span></div>
+    <div class="badge clock" id="clockBox" title="本机当前时间">--:--:--</div>
   </header>
 
   <div class="cards" id="overviewCards">
@@ -477,6 +479,18 @@ async function fetchSignRange(){
   }
 }
 /* ================= 启动 ================= */
+function startClock(){
+  const tick = () => {
+    const d = new Date();
+    const p = n => String(n).padStart(2, "0");
+    el("clockBox").textContent =
+      (d.getMonth() + 1) + "-" + p(d.getDate()) + " " +
+      p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+startClock();
 refreshAll();
 loadCreds();
 setInterval(()=>{ api("/api/status").then(renderStatus).catch(()=>{}); }, 60000);
