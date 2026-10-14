@@ -167,8 +167,12 @@ def effective_info():
     }
 
 def mask_username(name: str) -> str:
-    """完全掩码：不泄露学号任何位（含前缀）。"""
-    return "***" if name else ""
+    """账号脱敏：只保留前四位，其余掩码。"""
+    if not name:
+        return ""
+    if len(name) <= 4:
+        return name[0] + "***"
+    return name[:4] + "***"
 
 # ---------------- 引擎执行 ----------------
 def run_engine(dry: bool) -> str:
