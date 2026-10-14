@@ -399,6 +399,12 @@ def main():
     conf = yaml.safe_load(open(os.path.join(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))), "config.yml"), encoding="utf-8"))
     user = conf["users"][0]["user"]
+    # Web 页面保存的账号密码优先（环境变量传入）；未设置时回退 config.yml。
+    # 两个变量必须同时存在才生效，避免“账号/密码”错配。
+    if os.getenv("JRXY_USERNAME") and os.getenv("JRXY_PASSWORD"):
+        user["username"] = os.getenv("JRXY_USERNAME")
+        user["password"] = os.getenv("JRXY_PASSWORD")
+        print("使用 Web 页面保存的账号登录: %s" % user["username"])
     if args.lon is not None:
         user["lon"] = args.lon
     if args.lat is not None:

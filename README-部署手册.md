@@ -96,6 +96,7 @@ docker run -d -p 8000:8000 -v jrxy-sign-data:/app/web-server/data jrxy-sign
 |---|---|
 | 概览卡片 | 学校、账号（掩码）、任务类型、固定设备 ID、当前坐标、定时状态 |
 | 手动操作 | **只探测**（登录+查任务+构造提交体，无副作用） / **立即签到**（真实提交） |
+| 账号设置 | **Web 页面保存学号/密码**（写入 `data/credentials.json`，界面只显示掩码、绝不回传密码）；保存后签到/探测优先使用该账号，未保存时回退 `config.yml` |
 | 坐标与地址 | 修改经纬度（GCJ-02）与定位地址 + **地图选点**（点击/拖拽标记、地址搜索、浏览器定位；高德瓦片 GCJ-02 直接可用，不可达时自动回退 OpenStreetMap 并换算），保存后写 override.json |
 | 内置定时 | 启用/停用 + 每日签到时间（默认 22:05），服务器部署后自足运行 |
 | 运行日志 | SQLite 持久化，最近 50 条（时间/类型/结果/详情） |
@@ -127,7 +128,10 @@ deploy\start_windows.bat
 
 ## 安全说明（务必阅读）
 
-1. **密码明文**保存在 `jrxyzuixingnx/config.yml`。本界面与接口**永不返回密码**；
+1. **账号密码**：可在 Web 页面「账号设置」保存到本机 `web-server/data/credentials.json`
+   （该目录不入 git、界面与接口**永不返回密码**）；保存后 Web 触发的签到/探测通过环境变量
+   `JRXY_USERNAME` / `JRXY_PASSWORD` 传入引擎（优先于 config.yml）。**未在 Web 保存时回退
+   `jrxyzuixingnx/config.yml`**——豆包定时任务直连引擎，仍以 config.yml 为准。
    部署到公网前请自行评估风险（建议：仅内网/校园网使用，或加 WEB_TOKEN + 反向代理 HTTPS）。
 2. 默认仅监听 `127.0.0.1`，不对外暴露。
 3. **设备 ID 勿更换**：账号与设备绑定，更换会触发"疑似更换手机频繁"风控。
@@ -164,6 +168,12 @@ deploy\start_windows.bat
 curl http://127.0.0.1:8000/api/status
 curl -X POST http://127.0.0.1:8000/api/run -H "Content-Type: application/json" -d '{"mode":"dry"}'
 curl http://127.0.0.1:8000/api/logs
+
+# 账号设置（Web 保存学号/密码，密码绝不回传）
+curl http://127.0.0.1:8000/api/credentials
+curl -X POST http://127.0.0.1:8000/api/credentials \
+  -H "Content-Type: application/json" \
+  -d '{"username":"你的学号","password":"你的密码"}'
 ```
 
 带令牌时：
@@ -223,5 +233,5 @@ curl http://127.0.0.1:8000/api/status -H "X-Web-Token: <token>"
 
 ### G. 安全收尾
 
-- [ ] 密码只存在于服务器 `config.yml`；GitHub 仓库中仅有 `config.example.yml`（占位符）
+- [ ] 密码只存在于服务器 `config.yml`（或 Web「账号设置」保存的 `data/credentials.json`）；GitHub 仓库中仅有 `config.example.yml`（占位符）
 - [ ] 若监听 0.0.0.0：已设置 WEB_TOKEN，或已用 Nginx/Caddy 做 HTTPS 反代

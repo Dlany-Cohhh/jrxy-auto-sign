@@ -20,7 +20,9 @@
 
 安全提示：
   - 默认仅监听本机；对外部署务必设置 WEB_TOKEN 并启用 HTTPS/反向代理。
-  - 明文密码仅存在于 jrxyzuixingnx/config.yml，界面与接口绝不返回密码。
+  - 学号/密码可在 Web 页面保存，写入 data/credentials.json（不入 git、绝不返回密码）；
+    运行签到/探测时以环境变量传入引擎（优先于 config.yml）。config.yml 作为未在
+    Web 保存时的兜底（豆包定时任务直连引擎时仍用 config.yml）。
   - 坐标/地址修改优先写入 data/override.json（命令行参数覆盖），不改动 config.yml 注释结构。
 """
 import json
@@ -47,6 +49,7 @@ STATIC_DIR = WEB_DIR / "static"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "signlog.db"
 OVERRIDE_PATH = DATA_DIR / "override.json"
+CREDS_PATH = DATA_DIR / "credentials.json"
 INDEX_HTML = STATIC_DIR / "index.html"
 
 IS_WIN = os.name == "nt"
@@ -118,6 +121,29 @@ def load_override() -> dict:
 def save_override(d: dict):
     OVERRIDE_PATH.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
 
+# ---------------- Web 保存的账号密码（data/credentials.json，不入 git） ----------------
+def load_creds() -> dict:
+    if CREDS_PATH.exists():
+        try:
+            return json.loads(CREDS_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+def save_creds(username: str, password: str):
+    """username/password 同时为空 = 清除 Web 保存的账号。"""
+    d = {}
+    if username or password:
+        d = {"username": username.strip(), "password": password}
+    CREDS_PATH.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+
+def creds_env() -> dict:
+    """引擎运行时注入的账号环境变量；账号密码必须同时存在才生效。"""
+    cr = load_creds()
+    if cr.get("username") and cr.get("password"):
+        return {"JRXY_USERNAME": cr["username"], "JRXY_PASSWORD": cr["password"]}
+    return {}
+
 def read_device_id() -> str:
     for name in (".device_id", "device_id.txt"):
         p = ENGINE_DIR / name
@@ -126,12 +152,13 @@ def read_device_id() -> str:
     return ""
 
 def effective_info():
-    """有效配置 = override 优先，否则用 config.yml。"""
+    """有效配置 = Web 保存的账号优先，否则 config.yml；坐标 = override 优先。"""
     ov = load_override()
     u = user_config()
+    cr = load_creds()
     return {
         "school": u.get("schoolName", ""),
-        "username": u.get("username", ""),
+        "username": cr.get("username") or u.get("username", ""),
         "type": u.get("type", 2),
         "lon": ov.get("lon", u.get("lon")),
         "lat": ov.get("lat", u.get("lat")),
@@ -164,11 +191,13 @@ def run_engine(dry: bool) -> str:
     if e["address"]:
         args += ["--address", e["address"]]
     cmd = [str(ENGINE_PY), "-W", "ignore", str(SUBMIT_SCRIPT)] + args
+    env = dict(os.environ)
+    env.update(creds_env())   # Web 保存的账号密码（有则优先，无则回退 config.yml）
     log.info("engine cmd: %s", " ".join(str(x) for x in cmd))
     try:
         r = subprocess.run(
             cmd, cwd=str(ENGINE_DIR), capture_output=True, text=True,
-            timeout=180, encoding="utf-8", errors="replace",
+            timeout=180, encoding="utf-8", errors="replace", env=env,
         )
         out = (r.stdout or "").strip()
         if r.stderr and r.stderr.strip():
@@ -276,6 +305,33 @@ def api_status(_t: None = Depends(require_token)):
         },
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+@app.get("/api/credentials")
+def api_get_credentials(_t: None = Depends(require_token)):
+    cr = load_creds()
+    u = user_config()
+    has_web = bool(cr.get("username") and cr.get("password"))
+    return {
+        "source": "web" if has_web else "config",
+        "username": mask_username(cr.get("username") or u.get("username", "")),
+        "username_set": bool(cr.get("username")),
+        "password_set": bool(cr.get("password")),
+        "note": "账号保存在本机 data/credentials.json，密码绝不回传；未在 Web 保存时使用 config.yml 兜底",
+    }
+
+@app.post("/api/credentials")
+def api_set_credentials(body: dict, _t: None = Depends(require_token)):
+    username = str(body.get("username", "")).strip()
+    password = str(body.get("password", ""))
+    if username and not password:
+        raise HTTPException(status_code=400, detail="已填写学号，密码不能为空")
+    if password and not username:
+        raise HTTPException(status_code=400, detail="已填写密码，学号不能为空")
+    save_creds(username, password)
+    save_log("账号设置", "账号已通过 Web 保存" if username else "账号已清除",
+             "username=%s" % (mask_username(username) or "(空)"))
+    return {"ok": True, "source": "web" if (username and password) else "config",
+            "username": mask_username(username)}
 
 @app.post("/api/config")
 def api_config(body: dict, _t: None = Depends(require_token)):

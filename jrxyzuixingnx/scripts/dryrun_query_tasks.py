@@ -8,6 +8,7 @@
 不会产生任何签到提交。
 """
 import json
+import os
 import sys
 import traceback
 
@@ -22,6 +23,11 @@ from actions.utils import Utils
 
 conf = yaml.safe_load(open('config.yml', encoding='utf-8'))
 user = conf['users'][0]['user']
+# Web 页面保存的账号密码优先（环境变量传入）；未设置时回退 config.yml。
+if os.getenv('JRXY_USERNAME') and os.getenv('JRXY_PASSWORD'):
+    user['username'] = os.getenv('JRXY_USERNAME')
+    user['password'] = os.getenv('JRXY_PASSWORD')
+    print('使用 Web 页面保存的账号登录: %s' % user['username'])
 print('用户=%s 学校=%s type=%s' % (user.get('username'), user.get('schoolName'), user.get('type')))
 
 try:
