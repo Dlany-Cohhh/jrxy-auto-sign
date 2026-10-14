@@ -48,7 +48,8 @@ deploy\start_windows.bat
 或用 NSSM 注册为服务：
 
 ```bat
-nssm install jrxy-sign "E:\A-MyProject\今日校园自动签到\web-server\.venv\Scripts\python.exe" -m uvicorn app:app --host 127.0.0.1 --port 8000
+:: 将 <项目目录> 替换为实际路径
+nssm install jrxy-sign "<项目目录>\web-server\.venv\Scripts\python.exe" -m uvicorn app:app --host 127.0.0.1 --port 8000
 nssm start jrxy-sign
 ```
 
