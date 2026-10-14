@@ -231,6 +231,9 @@ function renderStatus(s){
   el("cType").textContent = {0:"收集",1:"签到",2:"查寝",3:"政工签到",4:"教师日志"}[s.type] ?? ("type="+s.type);
   el("cDev").textContent = s.device_id || "-";
   el("cCoord").textContent = (s.lon==null?"-":s.lon.toFixed(6)) + ", " + (s.lat==null?"-":s.lat.toFixed(6));
+  el("cSched").textContent = s.scheduler.enabled
+    ? (s.scheduler.time + " 启用" + (s.scheduler.next ? " · 下次 " + s.scheduler.next : ""))
+    : "已停用";
   el("inLon").value = s.lon==null ? "" : s.lon;
   el("inLat").value = s.lat==null ? "" : s.lat;
   el("inAddr").value = s.address || "";
