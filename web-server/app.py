@@ -224,6 +224,7 @@ def classify(out: str) -> str:
 
 # ---------------- 内置定时（线程版，零第三方依赖） ----------------
 scheduler_state = {"enabled": DEFAULT_AUTO_SIGN, "time": DEFAULT_SIGN_TIME, "next": None}
+_sched_wake = threading.Event()   # 设置变更时唤醒调度线程，立即重算下次执行
 
 def _parse_hm(s: str):
     try:
@@ -244,20 +245,29 @@ def scheduler_loop():
                 h, m = _parse_hm(st["time"])
             except ValueError:
                 st["next"] = None
-                time.sleep(60)
+                _sched_wake.wait(timeout=60)
+                _sched_wake.clear()
                 continue
             nxt = now.replace(hour=h, minute=m, second=0, microsecond=0)
             if nxt <= now:
                 nxt += timedelta(days=1)
             st["next"] = nxt.strftime("%Y-%m-%d %H:%M:%S")
-            wait = max((nxt - now).total_seconds(), 1)
-            time.sleep(wait)
+            wait = (nxt - now).total_seconds()
+            if wait > 60:
+                # 距触发点超过 60 秒：分段等待，随时响应时间/开关变更
+                _sched_wake.wait(timeout=60)
+                _sched_wake.clear()
+                continue
+            # 距触发点 <= 60 秒：睡到点触发（期间被唤醒则重算）
+            _sched_wake.wait(timeout=max(wait, 1))
+            _sched_wake.clear()
             log.info("定时签到触发（%s）", st["time"])
             out = run_engine(dry=False)
             save_log("定时签到", classify(out), out)
         else:
             st["next"] = None
-            time.sleep(30)
+            _sched_wake.wait(timeout=30)
+            _sched_wake.clear()
 
 def _start_scheduler():
     # 启动时把 override 中的定时配置合并进来（override 优先于环境变量）
@@ -369,6 +379,7 @@ def api_schedule(body: dict, _t: None = Depends(require_token)):
     save_override(ov)
     save_log("定时更新", "定时签到设置已更新",
              "enabled=%s time=%s" % (enabled, t))
+    _sched_wake.set()   # 立即唤醒调度线程，刷新下次执行时间
     return {"ok": True, "scheduler": {
         "enabled": enabled, "time": t, "next": scheduler_state["next"]}}
 
