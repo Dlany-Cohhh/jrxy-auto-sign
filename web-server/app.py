@@ -55,6 +55,7 @@ INDEX_HTML = STATIC_DIR / "index.html"
 IS_WIN = os.name == "nt"
 ENGINE_PY = ENGINE_DIR / (".venv/Scripts/python.exe" if IS_WIN else ".venv/bin/python")
 SUBMIT_SCRIPT = ENGINE_DIR / "scripts" / "merged_ios_v4_submit.py"
+RANGE_SCRIPT = ENGINE_DIR / "scripts" / "fetch_sign_range.py"
 
 # ---------------- 运行配置（环境变量） ----------------
 HOST = os.getenv("HOST", "127.0.0.1")
@@ -236,22 +237,30 @@ def _parse_hm(s: str):
     except Exception:
         raise ValueError("时间格式应为 HH:MM（如 22:05）")
 
+def _calc_next(time_str):
+    """计算下次触发时间；格式非法时返回 (None, None)。"""
+    try:
+        h, m = _parse_hm(time_str)
+    except ValueError:
+        return None, None
+    now = datetime.now()
+    nxt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    if nxt <= now:
+        nxt += timedelta(days=1)
+    return nxt, nxt.strftime("%Y-%m-%d %H:%M:%S")
+
 def scheduler_loop():
     while True:
         st = scheduler_state
         if st["enabled"]:
             now = datetime.now()
-            try:
-                h, m = _parse_hm(st["time"])
-            except ValueError:
+            nxt, nxt_str = _calc_next(st["time"])
+            if nxt is None:
                 st["next"] = None
                 _sched_wake.wait(timeout=60)
                 _sched_wake.clear()
                 continue
-            nxt = now.replace(hour=h, minute=m, second=0, microsecond=0)
-            if nxt <= now:
-                nxt += timedelta(days=1)
-            st["next"] = nxt.strftime("%Y-%m-%d %H:%M:%S")
+            st["next"] = nxt_str
             wait = (nxt - now).total_seconds()
             if wait > 60:
                 # 距触发点超过 60 秒：分段等待，随时响应时间/开关变更
@@ -363,6 +372,49 @@ def api_config(body: dict, _t: None = Depends(require_token)):
              "lon=%s lat=%s address=%s" % (lon, lat, address))
     return {"ok": True, "effective": effective_info()}
 
+@app.post("/api/sign-range")
+def api_sign_range(_t: None = Depends(require_token)):
+    """从服务端任务详情拉取签到范围（signPlaceSelected：中心点+半径），
+    并直接写入 data/override.json 作为签到地址立即生效。"""
+    if not ENGINE_PY.exists():
+        raise HTTPException(status_code=500, detail="引擎虚拟环境不存在: %s" % ENGINE_PY)
+    if not RANGE_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail="引擎脚本不存在: %s" % RANGE_SCRIPT)
+    cmd = [str(ENGINE_PY), "-W", "ignore", str(RANGE_SCRIPT)]
+    env = dict(os.environ)
+    env.update(creds_env())   # Web 保存的账号密码优先，无则回退 config.yml
+    try:
+        r = subprocess.run(cmd, cwd=str(ENGINE_DIR), capture_output=True, text=True,
+                           timeout=120, encoding="utf-8", errors="replace", env=env)
+    except subprocess.TimeoutExpired:
+        save_log("范围获取", "获取失败", "执行超时（120 秒）")
+        raise HTTPException(status_code=504, detail="获取签到范围超时（120 秒）")
+    except Exception as e:
+        save_log("范围获取", "获取失败", str(e)[:200])
+        raise HTTPException(status_code=500, detail="获取签到范围异常: %s" % e)
+    payload = None
+    for line in (r.stdout or "").splitlines():
+        if line.startswith("###RANGE###"):
+            try:
+                payload = json.loads(line[len("###RANGE###"):].strip())
+            except Exception:
+                payload = None
+            break
+    if not payload or not payload.get("ok"):
+        err = (payload or {}).get("error") or ((r.stderr or r.stdout or "").strip()[-300:])
+        save_log("范围获取", "获取失败", str(err)[:200])
+        raise HTTPException(status_code=502, detail="获取失败: %s" % err)
+    lon, lat = float(payload["lon"]), float(payload["lat"])
+    ov = load_override()
+    ov["lon"], ov["lat"], ov["address"] = lon, lat, payload.get("address") or ov.get("address", "")
+    save_override(ov)
+    detail = "center=(%.8f, %.8f) radius=%sm %s 窗口 %s~%s" % (
+        lon, lat, payload.get("radius"), payload.get("taskName", ""),
+        payload.get("window_begin", ""), payload.get("window_end", ""))
+    save_log("范围获取", "签到范围已获取并应用", detail)
+    return {"ok": True, "range": payload,
+            "note": "已写入 data/override.json：坐标与地址更新为服务端签到范围中心点（半径 %sm）" % payload.get("radius")}
+
 @app.post("/api/schedule")
 def api_schedule(body: dict, _t: None = Depends(require_token)):
     enabled = bool(body.get("enabled", scheduler_state["enabled"]))
@@ -373,15 +425,17 @@ def api_schedule(body: dict, _t: None = Depends(require_token)):
         raise HTTPException(status_code=400, detail=str(e))
     scheduler_state["enabled"] = enabled
     scheduler_state["time"] = t
+    _, nxt_str = _calc_next(t)          # 立即重算下次执行时间并返回
+    scheduler_state["next"] = nxt_str
     ov = load_override()
     ov["auto"] = enabled
     ov["sign_time"] = t
     save_override(ov)
     save_log("定时更新", "定时签到设置已更新",
              "enabled=%s time=%s" % (enabled, t))
-    _sched_wake.set()   # 立即唤醒调度线程，刷新下次执行时间
+    _sched_wake.set()   # 唤醒调度线程，按新配置重新等待
     return {"ok": True, "scheduler": {
-        "enabled": enabled, "time": t, "next": scheduler_state["next"]}}
+        "enabled": enabled, "time": t, "next": nxt_str}}
 
 @app.post("/api/run")
 def api_run(body: dict, _t: None = Depends(require_token)):
