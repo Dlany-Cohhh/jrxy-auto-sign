@@ -188,7 +188,7 @@ curl http://127.0.0.1:8000/api/status -H "X-Web-Token: <token>"
 
 > 用途：首次在 Linux 物理机/云服务器部署后逐项核验。
 > 脚本已修复 Python 3.12 依赖兼容（PyYAML>=6.0、urllib3==1.26.20）与 systemd 权限；
-> 已在一台 OpenStick（Debian 11 bullseye + Python 3.9.2，512MB 内存）实测通过
+> 已在一台低配随身 WiFi 设备（Debian 11 bullseye + Python 3.9.2，512MB 内存）实测通过
 > （引擎 dryrun / Web API / 外部访问全部验证），新环境首次部署仍请按本清单逐项核验。
 
 ### A. 环境与依赖（部署前）

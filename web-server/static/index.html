@@ -153,7 +153,7 @@
     </div>
     <div class="mapbox" id="mapbox">
       <div class="mapbar">
-        <input type="text" id="mapSearch" placeholder="搜索地址，如：韩山师范学院南三区 C 栋">
+        <input type="text" id="mapSearch" placeholder="搜索地址，如：学校名 宿舍区 楼栋">
         <button onclick="mapSearchGo()">搜索</button>
         <button class="ghost" onclick="useMyLoc()">📍 使用我的定位</button>
         <button class="ghost" onclick="toggleMap()">收起地图</button>
@@ -387,7 +387,7 @@ function ensureLeaflet(cb){
 function currentGcj(){
   const lon = parseFloat(el("inLon").value), lat = parseFloat(el("inLat").value);
   if (!isNaN(lon) && !isNaN(lat)) return {lon, lat};
-  return {lon:116.675613, lat:23.654200}; // 默认南三区参考坐标
+  return {lon:0, lat:0}; // 无默认坐标：请在页面地图选点并保存（勿内置个人坐标）
 }
 function initMap(){
   const g = currentGcj();                       // GCJ-02
