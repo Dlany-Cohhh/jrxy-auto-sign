@@ -45,6 +45,7 @@
     opacity:.9;
   }
   .brand{display:flex;align-items:center;gap:12px}
+  .head-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
   .brand-mark{
     display:inline-flex;align-items:center;justify-content:center;
     width:38px;height:38px;flex:none;
@@ -204,8 +205,10 @@
         <div class="sub">今日校园查寝/签到 · Web 管理界面</div>
       </div>
     </div>
-    <div class="badge" id="platformBadge"><span class="dot off" id="engineDot"></span><span id="engineText">连接中…</span></div>
-    <div class="badge clock" id="clockBox" title="本机当前时间">--:--:--</div>
+    <div class="head-side">
+      <div class="badge" id="platformBadge"><span class="dot off" id="engineDot"></span><span id="engineText">连接中…</span></div>
+      <div class="badge clock" id="clockBox" title="本机当前时间">--:--:--</div>
+    </div>
   </header>
 
   <div class="cards" id="overviewCards">
