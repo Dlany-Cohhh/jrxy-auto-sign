@@ -4,105 +4,204 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>今日校园自动签到 · 管理台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='1' y='1' width='22' height='22' rx='7' fill='%230b1220'/%3E%3Cpath d='M6.8 12.4l3.4 3.4 7-7.2' stroke='%2314b8a6' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root{
-    --bg:#0f172a; --card:#1e293b; --card2:#243349; --line:#334155;
-    --text:#e2e8f0; --muted:#94a3b8; --ok:#10b981; --warn:#f59e0b;
-    --bad:#f43f5e; --info:#38bdf8; --btn:#334155; --btn-hover:#475569;
+    --bg0:#070d1a; --bg:#0b1220; --card:#0f1a2e; --card2:#16233c;
+    --line:#223252; --line2:#2c3f63;
+    --text:#e7eef7; --muted:#8aa2bf; --faint:#64789a;
+    --ac1:#14b8a6; --ac2:#22c55e; --info:#38bdf8;
+    --warn:#f5a524; --bad:#fb5d74;
+    --radius:14px; --shadow:0 10px 30px rgba(2,8,20,.45);
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
   body{
-    background:var(--bg); color:var(--text);
+    min-height:100vh;padding:20px 16px;
+    color:var(--text);
     font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
-    font-size:14px; line-height:1.6; padding:24px;
+    font-size:14px;line-height:1.6;
+    background:
+      radial-gradient(900px 420px at 18% -8%, rgba(20,184,166,.13), transparent 60%),
+      radial-gradient(760px 380px at 88% -10%, rgba(56,189,248,.10), transparent 55%),
+      var(--bg0);
+    background-attachment:fixed;
   }
-  .wrap{max-width:1080px;margin:0 auto}
+  ::selection{background:rgba(20,184,166,.28)}
+  .wrap{max-width:1120px;margin:0 auto}
+  a{color:var(--info)}
+
+  /* ===== 头部 ===== */
   header{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:16px 20px;background:var(--card);border:1px solid var(--line);
-    border-radius:12px;margin-bottom:20px;
+    display:flex;flex-direction:column;gap:12px;align-items:flex-start;
+    padding:18px 20px;margin-bottom:20px;
+    background:linear-gradient(180deg, rgba(22,35,60,.85), rgba(15,26,46,.92));
+    border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);position:relative;overflow:hidden;
   }
-  header h1{font-size:18px;font-weight:600}
+  header::after{
+    content:"";position:absolute;inset:0 auto 0 0;width:3px;
+    background:linear-gradient(180deg,var(--ac1),var(--ac2));
+    opacity:.9;
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-mark{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:38px;height:38px;flex:none;
+    background:linear-gradient(160deg, #0e1c33, #102a3f);
+    border:1px solid var(--line2);border-radius:11px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .brand-mark svg{width:24px;height:24px}
+  header h1{font-size:19px;font-weight:700;letter-spacing:.2px}
   header .sub{color:var(--muted);font-size:12px;margin-top:2px}
-  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card2)}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-  .dot.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
-  .dot.off{background:var(--bad)}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-  .card .k{color:var(--muted);font-size:12px}
-  .card .v{font-size:16px;font-weight:600;margin-top:4px;word-break:break-all}
-  .card .v.small{font-size:13px;font-family:Consolas,Menlo,monospace}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:20px}
-  .panel h2{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-  .panel h2 .tag{font-size:11px;color:var(--muted);font-weight:400}
-  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
-  .field{display:flex;flex-direction:column;gap:6px}
+  .badge{
+    display:inline-flex;align-items:center;gap:7px;font-size:12px;
+    padding:5px 12px;border-radius:999px;
+    border:1px solid var(--line);background:var(--card2);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .dot.on{background:var(--ac2);box-shadow:0 0 10px rgba(34,197,94,.75)}
+  .dot.off{background:var(--bad);box-shadow:0 0 8px rgba(251,93,116,.6)}
+
+  /* ===== 概览卡片 ===== */
+  .cards{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:20px}
+  .card{
+    background:linear-gradient(180deg, var(--card), #0d1729);
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;transition:border-color .18s, transform .18s;
+  }
+  .card:hover{border-color:var(--line2);transform:translateY(-1px)}
+  .card .k{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:6px}
+  .card .k::before{content:"";width:6px;height:6px;border-radius:2px;background:linear-gradient(135deg,var(--ac1),var(--ac2));opacity:.85}
+  .card .v{font-size:16px;font-weight:650;margin-top:4px;word-break:break-all}
+  .card .v.small{font-size:13px;font-family:ui-monospace,Consolas,Menlo,monospace;color:var(--text)}
+
+  /* ===== 面板 ===== */
+  .panel{
+    background:linear-gradient(180deg, var(--card), #0d1729);
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 18px 20px;margin-bottom:18px;box-shadow:var(--shadow);
+  }
+  .panel h2{
+    font-size:15px;font-weight:650;margin-bottom:14px;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .hico{
+    display:inline-flex;align-items:center;justify-content:center;flex:none;
+    width:26px;height:26px;border-radius:8px;
+    background:rgba(20,184,166,.10);border:1px solid rgba(20,184,166,.28);
+    color:var(--ac1);
+  }
+  .hico svg{width:15px;height:15px}
+  .panel h2 .tag{font-size:11px;color:var(--muted);font-weight:400;flex-basis:100%;margin-left:36px}
+
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px;flex:1 1 180px;min-width:0}
   .field label{font-size:12px;color:var(--muted)}
   input[type=text],input[type=number],input[type=time],input[type=password]{
-    background:var(--card2);color:var(--text);border:1px solid var(--line);
-    border-radius:8px;padding:9px 12px;font-size:14px;min-width:180px;outline:none;
+    width:100%;background:var(--card2);color:var(--text);
+    border:1px solid var(--line);border-radius:9px;
+    padding:10px 12px;font-size:16px;outline:none;
+    transition:border-color .15s, box-shadow .15s;
   }
-  input:focus{border-color:var(--info)}
+  input:focus{border-color:var(--info);box-shadow:0 0 0 3px rgba(56,189,248,.14)}
   button{
-    background:var(--btn);color:var(--text);border:1px solid var(--line);
-    border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;transition:background .15s;
+    background:var(--card2);color:var(--text);border:1px solid var(--line2);
+    border-radius:9px;padding:10px 18px;font-size:14px;cursor:pointer;
+    transition:background .15s, border-color .15s, transform .12s, box-shadow .15s;
   }
-  button:hover{background:var(--btn-hover)}
-  button:disabled{opacity:.45;cursor:not-allowed}
-  button.primary{background:var(--ok);border-color:var(--ok);color:#04140c;font-weight:600}
-  button.primary:hover{background:#34d399}
+  button:hover{background:#1b2c49;border-color:#3a5180}
+  button:active{transform:translateY(1px)}
+  button:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+  button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  button.primary{
+    background:linear-gradient(135deg, var(--ac1), var(--ac2));
+    border-color:transparent;color:#03130d;font-weight:700;
+    box-shadow:0 4px 16px rgba(20,184,166,.30);
+  }
+  button.primary:hover{filter:brightness(1.08);background:linear-gradient(135deg, var(--ac1), var(--ac2))}
   button.danger{background:var(--bad);border-color:var(--bad);color:#fff}
-  button.ghost{background:transparent}
+  button.ghost{background:transparent;border-color:var(--line)}
+
+  /* ===== 结果框 / 表格 / 徽标 / 日志 ===== */
   .result{
     margin-top:14px;border-radius:10px;padding:12px 16px;font-size:13px;display:none;
     border:1px solid var(--line);white-space:pre-wrap;word-break:break-all;
-    max-height:260px;overflow:auto;font-family:Consolas,Menlo,monospace;
+    max-height:260px;overflow:auto;font-family:ui-monospace,Consolas,monospace;
   }
   .result.show{display:block}
-  .result.ok{border-color:var(--ok);background:rgba(16,185,129,.08);color:#a7f3d0}
-  .result.warn{border-color:var(--warn);background:rgba(245,158,11,.08);color:#fde68a}
-  .result.bad{border-color:var(--bad);background:rgba(244,63,94,.08);color:#fecdd3}
+  .result.ok{border-color:rgba(34,197,94,.55);background:rgba(20,184,166,.09);color:#a7f3d0}
+  .result.warn{border-color:rgba(245,165,36,.55);background:rgba(245,165,36,.08);color:#fde68a}
+  .result.bad{border-color:rgba(251,93,116,.55);background:rgba(251,93,116,.08);color:#fecdd3}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--muted);font-weight:500;font-size:12px}
+  th{color:var(--muted);font-weight:600;font-size:12px;background:rgba(255,255,255,.02);letter-spacing:.2px}
   td.detail{color:var(--muted);max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tbl-scroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .tbl-scroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:11px}
+  .tbl-scroll::-webkit-scrollbar{width:9px;height:9px}
+  .tbl-scroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
+  .tbl-scroll::-webkit-scrollbar-track{background:transparent}
   .pill{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--line)}
-  .pill.ok{color:#a7f3d0;border-color:var(--ok)}
-  .pill.warn{color:#fde68a;border-color:var(--warn)}
-  .pill.bad{color:#fecdd3;border-color:var(--bad)}
+  .pill.ok{color:#a7f3d0;border-color:rgba(34,197,94,.5);background:rgba(20,184,166,.08)}
+  .pill.warn{color:#fde68a;border-color:rgba(245,165,36,.5);background:rgba(245,165,36,.08)}
+  .pill.bad{color:#fecdd3;border-color:rgba(251,93,116,.5);background:rgba(251,93,116,.08)}
   .pill.def{color:var(--muted)}
   .log-row td{cursor:pointer}
-  .log-row:hover td{background:rgba(255,255,255,.04)}
+  .log-row:hover td{background:rgba(255,255,255,.045)}
   .log-detail td{background:rgba(255,255,255,.03);padding:8px 12px}
-  .log-detail pre{margin:0;white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.6;max-height:340px;overflow:auto;font-family:ui-monospace,Consolas,monospace;color:var(--fg)}
-  footer{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}
+  .log-detail pre{margin:0;white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.6;max-height:340px;overflow:auto;font-family:ui-monospace,Consolas,monospace;color:var(--text)}
+
+  footer{margin-top:24px;color:var(--faint);font-size:12px;text-align:center;line-height:1.7}
   .toast{
-    position:fixed;top:20px;right:20px;z-index:999;padding:10px 16px;border-radius:8px;
-    font-size:13px;border:1px solid var(--line);background:var(--card2);box-shadow:0 8px 24px rgba(0,0,0,.35);
-    transform:translateX(120%);transition:transform .25s;max-width:360px;
+    position:fixed;top:20px;right:20px;z-index:999;padding:10px 16px;border-radius:10px;
+    font-size:13px;border:1px solid var(--line2);background:var(--card2);
+    box-shadow:0 10px 30px rgba(0,0,0,.5);transform:translateX(120%);
+    transition:transform .25s;max-width:min(360px,90vw);
   }
   .toast.show{transform:translateX(0)}
-  .toast.ok{border-color:var(--ok)} .toast.bad{border-color:var(--bad)}
+  .toast.ok{border-color:rgba(34,197,94,.5)} .toast.bad{border-color:rgba(251,93,116,.55)}
   .mask{
-    position:fixed;inset:0;background:rgba(2,6,23,.75);display:none;align-items:center;justify-content:center;z-index:50;
+    position:fixed;inset:0;background:rgba(4,8,18,.78);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;z-index:50;padding:16px;
   }
   .mask.show{display:flex}
-  .modal{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 28px;width:min(400px,90vw)}
+  .modal{background:var(--card);border:1px solid var(--line2);border-radius:16px;padding:26px 28px;width:min(400px,100%)}
   .modal h3{font-size:16px;margin-bottom:10px}
   .modal p{color:var(--muted);font-size:13px;margin-bottom:16px}
-  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  .spinner{
+    display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.25);
+    border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite;
+    vertical-align:-2px;margin-right:6px;
+  }
   @keyframes spin{to{transform:rotate(360deg)}}
   .hint{color:var(--muted);font-size:12px;margin-top:8px;word-break:break-all}
+
+  /* ===== 响应式（移动优先）===== */
+  @media (min-width:560px){
+    .cards{grid-template-columns:repeat(2,1fr)}
+    body{padding:24px}
+  }
+  @media (min-width:900px){
+    .cards{grid-template-columns:repeat(3,1fr)}
+    header{flex-direction:row;align-items:center;justify-content:space-between}
+    .wrap{max-width:1120px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div>
-      <h1>今日校园自动签到 · 管理台</h1>
-      <div class="sub">今日校园查寝/签到 · Web 管理界面</div>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="7" fill="#0e1c33" stroke="#2c3f63"/><path d="M6.8 12.4l3.4 3.4 7-7.2" stroke="#14b8a6" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <div>
+        <h1>今日校园自动签到 · 管理台</h1>
+        <div class="sub">今日校园查寝/签到 · Web 管理界面</div>
+      </div>
     </div>
     <div class="badge" id="platformBadge"><span class="dot off" id="engineDot"></span><span id="engineText">连接中…</span></div>
   </header>
@@ -117,7 +216,7 @@
   </div>
 
   <div class="panel">
-    <h2>手动操作 <span class="tag">dry 只探测不提交；submit 会真实完成一次查寝签到</span></h2>
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>手动操作 <span class="tag">dry 只探测不提交；submit 会真实完成一次查寝签到</span></h2>
     <div class="row">
       <button class="ghost" id="btnDry" onclick="run('dry')">只探测（无副作用）</button>
       <button class="primary" id="btnSubmit" onclick="run('submit')">立即签到（真实提交）</button>
@@ -127,7 +226,7 @@
   </div>
 
   <div class="panel">
-    <h2>账号设置 <span class="tag">学号/密码保存到本机 data/credentials.json（Web 保存优先于 config.yml）；界面与接口永不显示密码</span></h2>
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>账号设置 <span class="tag">学号/密码保存到本机 data/credentials.json（Web 保存优先于 config.yml）；界面与接口永不显示密码</span></h2>
     <div class="row">
       <div class="field"><label>学号（用户名）</label><input type="text" id="inUser" autocomplete="username" placeholder="如 2023000001"></div>
       <div class="field"><label>密码</label><input type="password" id="inPass" autocomplete="current-password" placeholder="不输入则保持原密码"></div>
@@ -139,7 +238,7 @@
   </div>
 
   <div class="panel">
-    <h2>坐标与地址 <span class="tag">签到坐标直接取自服务端任务详情 signPlaceSelected（中心点 + 半径）· 保存后写入 data/override.json 立即生效（含定时任务）</span></h2>
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7-5.3-7-11a7 7 0 1 1 14 0c0 5.7-7 11-7 11z" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></span>坐标与地址 <span class="tag">签到坐标直接取自服务端任务详情 signPlaceSelected（中心点 + 半径）· 保存后写入 data/override.json 立即生效（含定时任务）</span></h2>
     <div class="row">
       <div class="field"><label>经度 lon（GCJ-02）</label><input type="number" step="0.000001" id="inLon"></div>
       <div class="field"><label>纬度 lat（GCJ-02）</label><input type="number" step="0.000001" id="inLat"></div>
@@ -151,7 +250,7 @@
   </div>
 
   <div class="panel">
-    <h2>内置定时签到 <span class="tag">服务器部署时的自足定时器（本机部署可同时保留豆包定时任务）</span></h2>
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 7.2V12l3.4 2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>内置定时签到 <span class="tag">服务器部署时的自足定时器（本机部署可同时保留豆包定时任务）</span></h2>
     <div class="row">
       <div class="field"><label>启用定时</label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -165,7 +264,7 @@
   </div>
 
   <div class="panel">
-    <h2>运行日志 <span class="tag">最近记录（最多 200 条）</span></h2>
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>运行日志 <span class="tag">最近记录（最多 200 条）</span></h2>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th style="width:150px">时间</th><th style="width:110px">类型</th><th style="width:150px">结果</th><th>详情</th></tr></thead>
