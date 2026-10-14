@@ -38,6 +38,15 @@
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:20px}
   .panel h2{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
   .panel h2 .tag{font-size:11px;color:var(--muted);font-weight:400}
+  .method{border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:0 0 14px;background:var(--card2)}
+  .method-title{color:var(--info);font-weight:600;margin-bottom:6px}
+  .method-steps{margin:4px 0 6px 20px}
+  .method-steps li{margin:3px 0;color:var(--text)}
+  .method-result{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+  .method-result-title{color:var(--ok);font-weight:600;margin-bottom:6px}
+  .method-result ul{margin:4px 0 0 20px}
+  .method-result li{margin:3px 0;color:var(--text)}
+  .method code{background:var(--bg);padding:2px 7px;border-radius:6px;color:#fbbf24;font-family:Consolas,Menlo,monospace;font-size:13px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
   .field{display:flex;flex-direction:column;gap:6px}
   .field label{font-size:12px;color:var(--muted)}
@@ -75,6 +84,10 @@
   .pill.warn{color:#fde68a;border-color:var(--warn)}
   .pill.bad{color:#fecdd3;border-color:var(--bad)}
   .pill.def{color:var(--muted)}
+  .log-row td{cursor:pointer}
+  .log-row:hover td{background:rgba(255,255,255,.04)}
+  .log-detail td{background:rgba(255,255,255,.03);padding:8px 12px}
+  .log-detail pre{margin:0;white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.6;max-height:340px;overflow:auto;font-family:ui-monospace,Consolas,monospace;color:var(--fg)}
   footer{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}
   .toast{
     position:fixed;top:20px;right:20px;z-index:999;padding:10px 16px;border-radius:8px;
@@ -144,6 +157,22 @@
 
   <div class="panel">
     <h2>坐标与地址 <span class="tag">保存后写入 data/override.json 立即生效（含定时任务）· 地图选点：高德瓦片 GCJ-02 直接可用，不可达时自动回退 OpenStreetMap</span></h2>
+    <div class="method">
+      <div class="method-title">📌 验证签到范围方案</div>
+      <ol class="method-steps">
+        <li>最可靠的办法是<strong>直接向服务器要该查寝任务的签到范围（中心点 + 半径）</strong>。先看引擎查详情代码，再跑一个探测把完整任务详情 JSON dump 出来。</li>
+        <li>写一个临时探测脚本，把任务详情的<strong>完整原始 JSON</strong> 拉出来（可能含签到范围 / 中心坐标字段）。</li>
+        <li>读取相关配置文件。</li>
+      </ol>
+      <div class="method-result">
+        <div class="method-result-title">✅ 找到权威答案！服务器返回了该查寝任务的签到范围：</div>
+        <ul>
+          <li>签到中心：<code>116.68000000000000, 23.66000000000000</code>（地址：签到地点）</li>
+          <li>半径：<strong>500 米</strong></li>
+          <li>任务窗口：今晚 21:00–23:15（当前在窗口内，所以这次返回的是位置错误而不是“未开始”）</li>
+        </ul>
+      </div>
+    </div>
     <div class="row">
       <div class="field"><label>经度 lon（GCJ-02）</label><input type="number" step="0.000001" id="inLon"></div>
       <div class="field"><label>纬度 lat（GCJ-02）</label><input type="number" step="0.000001" id="inLat"></div>
@@ -256,17 +285,27 @@ function renderStatus(s){
   el("platformBadge").title = "服务器时间 " + s.server_time;
   syncMarkerFromInputs();
 }
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function truncate(s,n){n=n||120;return s.length>n?s.slice(0,n)+"…":s;}
+function toggleLogDetail(row){
+  const d = row.nextElementSibling;
+  if (d && d.classList.contains("log-detail")){
+    d.style.display = (d.style.display === "none") ? "" : "none";
+  }
+}
 function renderLogs(logs){
   const b = el("logBody");
   if (!logs.length){ b.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">暂无记录</td></tr>'; return; }
   b.innerHTML = logs.map(l=>{
     const cls = l.result.includes("成功") ? "ok" : (l.result.includes("未开始") || l.result.includes("重复") ? "warn" : (l.result.includes("失败")||l.result.includes("异常") ? "bad" : "def"));
-    return `<tr>
-      <td>${l.ts}</td>
-      <td><span class="pill def">${l.kind}</span></td>
-      <td><span class="pill ${cls}">${l.result}</span></td>
-      <td class="detail" title="${l.detail.replace(/"/g,"&quot;")}">${l.detail}</td>
-    </tr>`;
+    const safe = esc(l.detail);
+    return `<tr class="log-row" onclick="toggleLogDetail(this)">
+      <td>${esc(l.ts)}</td>
+      <td><span class="pill def">${esc(l.kind)}</span></td>
+      <td><span class="pill ${cls}">${esc(l.result)}</span></td>
+      <td class="detail" title="点击展开完整详情">${esc(truncate(l.detail))}</td>
+    </tr>
+    <tr class="log-detail" style="display:none"><td colspan="4"><pre>${safe}</pre></td></tr>`;
   }).join("");
 }
 async function refreshAll(){
@@ -544,6 +583,7 @@ refreshAll();
 loadCreds();
 if (location.hash === "#map") setTimeout(toggleMap, 600);
 setInterval(()=>{ api("/api/status").then(renderStatus).catch(()=>{}); }, 60000);
+setInterval(()=>{ api("/api/logs?limit=50").then(lg=>renderLogs(lg.logs)).catch(()=>{}); }, 30000);
 </script>
 </body>
 </html>
