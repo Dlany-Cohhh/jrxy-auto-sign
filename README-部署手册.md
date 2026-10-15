@@ -9,7 +9,7 @@
 
 ```
 今日校园自动签到/
-├── jrxyzuixingnx/            # 签到引擎（核心脚本 + config.yml + .venv，勿改结构）
+├── jrxy-engine/            # 签到引擎（核心脚本 + config.yml + .venv，勿改结构）
 ├── web-server/               # Web 服务（本次新增）
 │   ├── app.py                # FastAPI 主程序（API + 内置定时 + 跨平台路径）
 │   ├── requirements.txt      # Web 依赖（仅 3 个轻量包）
@@ -86,7 +86,7 @@ docker run -d -p 8000:8000 -v jrxy-sign-data:/app/web-server/data jrxy-sign
 ```
 
 浏览器打开 `http://<服务器IP>:8000`。
-容器内引擎配置位于 `/app/jrxyzuixingnx/config.yml`，建议在 compose 中挂载该文件以便维护。
+容器内引擎配置位于 `/app/jrxy-engine/config.yml`，建议在 compose 中挂载该文件以便维护。
 
 ---
 
@@ -131,11 +131,11 @@ deploy\start_windows.bat
 1. **账号密码**：可在 Web 页面「账号设置」保存到本机 `web-server/data/credentials.json`
    （该目录不入 git、界面与接口**永不返回密码**）；保存后 Web 触发的签到/探测通过环境变量
    `JRXY_USERNAME` / `JRXY_PASSWORD` 传入引擎（优先于 config.yml）。**未在 Web 保存时回退
-   `jrxyzuixingnx/config.yml`**——豆包定时任务直连引擎，仍以 config.yml 为准。
+   `jrxy-engine/config.yml`**——豆包定时任务直连引擎，仍以 config.yml 为准。
    部署到公网前请自行评估风险（建议：仅内网/校园网使用，或加 WEB_TOKEN + 反向代理 HTTPS）。
 2. 默认仅监听 `127.0.0.1`，不对外暴露。
 3. **设备 ID 勿更换**：账号与设备绑定，更换会触发"疑似更换手机频繁"风控。
-   删除 `jrxyzuixingnx/device_id.txt` 会生成新 ID——非必要不要动。
+   删除 `jrxy-engine/device_id.txt` 会生成新 ID——非必要不要动。
 4. 坐标不在签到点半径内会返回"签到失败"，需按上面方法换精确坐标。
 
 ---
@@ -206,7 +206,7 @@ curl http://127.0.0.1:8000/api/status -H "X-Web-Token: <token>"
 - [ ] Web `.venv/bin/python -c "import fastapi, uvicorn, yaml"` 无报错
 - [ ] ddddocr 未安装属正常（懒加载，默认 CLOUD 登录无验证码；**512MB 内存设备勿装，会 OOM**）
 
-### C. 配置（`jrxyzuixingnx/config.yml`）
+### C. 配置（`jrxy-engine/config.yml`）
 
 - [ ] `schoolName` / `username` / `password` / 坐标（GCJ-02）/ `address` 已按实际填写
 - [ ] `device_id.txt`（或 `.device_id`）已放置固定设备 ID，**勿重新生成**
@@ -228,7 +228,7 @@ curl http://127.0.0.1:8000/api/status -H "X-Web-Token: <token>"
 ### F. Docker 方式（如采用）
 
 - [ ] `docker compose up -d --build` 构建成功（引擎依赖安装阶段无 PyYAML 编译报错）
-- [ ] 容器日志无 `libgomp` 报错；`docker exec <容器> bash -c "cd jrxyzuixingnx && .venv/bin/python scripts/dryrun_query_tasks.py"` 链路通过
+- [ ] 容器日志无 `libgomp` 报错；`docker exec <容器> bash -c "cd jrxy-engine && .venv/bin/python scripts/dryrun_query_tasks.py"` 链路通过
 - [ ] config.yml 通过卷挂载进容器（不要在镜像里烧录明文密码）
 
 ### G. 安全收尾

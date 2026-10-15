@@ -1,9 +1,9 @@
 # ===== 敏感配置（严禁提交）=====
-jrxyzuixingnx/config.yml
-jrxyzuixingnx/device_id.txt
-jrxyzuixingnx/.device_id
-jrxyzuixingnx/*.log
-jrxyzuixingnx/aes_test*.txt
+jrxy-engine/config.yml
+jrxy-engine/device_id.txt
+jrxy-engine/.device_id
+jrxy-engine/*.log
+jrxy-engine/aes_test*.txt
 *.log
 
 # ===== 虚拟环境 / 运行时数据 =====
@@ -13,7 +13,7 @@ __pycache__/
 *.pyc
 web-server/data/
 web-server/.venv/
-jrxyzuixingnx/.venv/
+jrxy-engine/.venv/
 auto-sign/
 
 # ===== 系统/编辑器 =====
@@ -30,8 +30,8 @@ _shots/
 web-server/static/_shots/
 
 # ===== 签到照片（Web 上传到引擎根目录，可能含个人图像）=====
-jrxyzuixingnx/*.jpg
-jrxyzuixingnx/*.jpeg
-jrxyzuixingnx/*.png
-jrxyzuixingnx/*.webp
-jrxyzuixingnx/*.gif
+jrxy-engine/*.jpg
+jrxy-engine/*.jpeg
+jrxy-engine/*.png
+jrxy-engine/*.webp
+jrxy-engine/*.gif

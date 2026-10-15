@@ -3,7 +3,7 @@
 """
 今日校园自动签到 · Web 服务
 ============================
-将 jrxyzuixingnx 签到引擎封装为可部署在 Windows / Linux 服务器上的 Web 服务，
+将 jrxy-engine 签到引擎封装为可部署在 Windows / Linux 服务器上的 Web 服务，
 提供管理界面（状态概览 / 手动签到 / 坐标与定时设置 / 运行日志）。
 
 启动方式（二选一，见 README-部署手册.md）：
@@ -43,7 +43,7 @@ from fastapi.responses import FileResponse
 
 # ---------------- 路径 ----------------
 ROOT = Path(__file__).resolve().parent.parent          # 项目根目录
-ENGINE_DIR = ROOT / "jrxyzuixingnx"                    # 签到引擎目录
+ENGINE_DIR = ROOT / "jrxy-engine"                    # 签到引擎目录
 WEB_DIR = Path(__file__).resolve().parent
 DATA_DIR = WEB_DIR / "data"
 STATIC_DIR = WEB_DIR / "static"

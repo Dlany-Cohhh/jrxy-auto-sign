@@ -5,13 +5,13 @@ rem  Installs engine venv + web venv, then prints start command.
 rem ============================================================
 setlocal
 set ROOT=%~dp0..
-echo [1/4] Creating engine virtual env (jrxyzuixingnx\.venv)...
-if not exist "%ROOT%\jrxyzuixingnx\.venv" (
-  python -m venv "%ROOT%\jrxyzuixingnx\.venv" || goto :fail
+echo [1/4] Creating engine virtual env (jrxy-engine\.venv)...
+if not exist "%ROOT%\jrxy-engine\.venv" (
+  python -m venv "%ROOT%\jrxy-engine\.venv" || goto :fail
 )
 echo [2/4] Installing engine dependencies (large, incl. OCR libs, a few minutes)...
-"%ROOT%\jrxyzuixingnx\.venv\Scripts\python.exe" -m pip install -q --upgrade pip
-"%ROOT%\jrxyzuixingnx\.venv\Scripts\python.exe" -m pip install -q -r "%ROOT%\jrxyzuixingnx\requirements.txt" || goto :fail
+"%ROOT%\jrxy-engine\.venv\Scripts\python.exe" -m pip install -q --upgrade pip
+"%ROOT%\jrxy-engine\.venv\Scripts\python.exe" -m pip install -q -r "%ROOT%\jrxy-engine\requirements.txt" || goto :fail
 echo [3/4] Creating web venv (web-server\.venv)...
 if not exist "%ROOT%\web-server\.venv" (
   python -m venv "%ROOT%\web-server\.venv" || goto :fail

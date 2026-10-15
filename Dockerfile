@@ -16,16 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 ca-cer
     && rm -rf /var/lib/apt/lists/*
 
 # 先装依赖（利用构建缓存）
-COPY jrxyzuixingnx/requirements.txt /tmp/engine-req.txt
-RUN python -m venv /app/jrxyzuixingnx/.venv \
-    && /app/jrxyzuixingnx/.venv/bin/pip install --no-cache-dir -q -r /tmp/engine-req.txt
+COPY jrxy-engine/requirements.txt /tmp/engine-req.txt
+RUN python -m venv /app/jrxy-engine/.venv \
+    && /app/jrxy-engine/.venv/bin/pip install --no-cache-dir -q -r /tmp/engine-req.txt
 
 COPY web-server/requirements.txt /tmp/web-req.txt
 RUN python -m venv /app/web-server/.venv \
     && /app/web-server/.venv/bin/pip install --no-cache-dir -q -r /tmp/web-req.txt
 
 # 复制引擎与 Web 服务（auto-sign 为已失效原仓库，不进镜像，见 .dockerignore）
-COPY jrxyzuixingnx /app/jrxyzuixingnx
+COPY jrxy-engine /app/jrxy-engine
 COPY web-server /app/web-server
 
 # 运行时数据（签到日志、坐标覆盖配置）持久化

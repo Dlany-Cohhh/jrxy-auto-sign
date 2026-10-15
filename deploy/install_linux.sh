@@ -37,10 +37,10 @@ else
 fi
 
 echo "[3/6] 创建引擎虚拟环境并安装依赖（含 OCR 库，较大，需几分钟）..."
-python3 -m venv "$ROOT/jrxyzuixingnx/.venv"
-"$ROOT/jrxyzuixingnx/.venv/bin/pip" install --quiet --upgrade pip
+python3 -m venv "$ROOT/jrxy-engine/.venv"
+"$ROOT/jrxy-engine/.venv/bin/pip" install --quiet --upgrade pip
 # PyYAML>=6.0 与 urllib3==1.26.20 已在 requirements.txt 固定，兼容 Python 3.12
-"$ROOT/jrxyzuixingnx/.venv/bin/pip" install --quiet -r "$ROOT/jrxyzuixingnx/requirements.txt"
+"$ROOT/jrxy-engine/.venv/bin/pip" install --quiet -r "$ROOT/jrxy-engine/requirements.txt"
 
 echo "[4/6] 创建 Web 虚拟环境并安装依赖..."
 python3 -m venv "$ROOT/web-server/.venv"
@@ -53,7 +53,7 @@ if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
   if [ "$(id -u)" -ne 0 ]; then echo "需要 root 权限安装 systemd 服务，请用 sudo 重跑"; exit 1; fi
   mkdir -p "$INSTALL_PATH"
   # 复制引擎与 Web 服务
-  cp -r "$ROOT/jrxyzuixingnx" "$INSTALL_PATH/"
+  cp -r "$ROOT/jrxy-engine" "$INSTALL_PATH/"
   cp -r "$ROOT/web-server" "$INSTALL_PATH/"
   cp "$ROOT/README-部署手册.md" "$INSTALL_PATH/" 2>/dev/null || true
   # 运行用户：确保 www-data 存在并赋予项目目录权限

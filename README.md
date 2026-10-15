@@ -34,7 +34,7 @@
 
 ```
 .
-├── jrxyzuixingnx/            # 签到引擎（核心协议实现）
+├── jrxy-engine/            # 签到引擎（核心协议实现）
 │   ├── actions/              # CAS 登录 / 查任务 / 组表单 / 推送
 │   ├── scripts/              # 提交 / 探测 / 密钥工具脚本
 │   ├── docs/                 # 协议逆向分析文档
@@ -56,7 +56,7 @@
 复制配置模板并填写：
 
 ```bash
-cp jrxyzuixingnx/config.example.yml jrxyzuixingnx/config.yml
+cp jrxy-engine/config.example.yml jrxy-engine/config.yml
 ```
 
 关键字段（`config.yml` 已被 `.gitignore` 排除，不会提交到仓库）：
@@ -102,7 +102,7 @@ docker compose up -d --build
 
 ```bash
 # 只探测（无副作用）：登录 + 查任务 + 构造提交体
-cd jrxyzuixingnx
+cd jrxy-engine
 .venv/bin/python -W ignore scripts/dryrun_query_tasks.py
 
 # 真实提交（会完成一次查寝签到）
@@ -152,11 +152,11 @@ cd jrxyzuixingnx
 4. **提交**：构造表单 → AES 加密 `bodyString` → 按协议（iOS/Android/App）签名提交；
 5. **坐标**：GCJ-02 坐标系，与今日校园 App 一致。
 
-协议逆向细节见 `jrxyzuixingnx/docs/`。
+协议逆向细节见 `jrxy-engine/docs/`。
 
 ## 上游致谢与 License
 
-- 引擎协议实现参考上游项目 [`maserpoassr/jrxyzuixingnx`](https://github.com/maserpoassr/jrxyzuixingnx)（MPL-2.0）；
-- 引擎部分沿用上游 MPL-2.0 许可（见 `jrxyzuixingnx/LICENSE`）；本仓库新增的 Web 服务与部署脚本供本项目内使用。
+- 引擎协议实现参考上游项目 [`maserpoassr/jrxy-engine`](https://github.com/maserpoassr/jrxy-engine)（MPL-2.0）；
+- 引擎部分沿用上游 MPL-2.0 许可（见 `jrxy-engine/LICENSE`）；本仓库新增的 Web 服务与部署脚本供本项目内使用。
 
 > ⚠️ 本项目仅供学习与个人自动化使用，请勿滥用。使用前请确认你的使用场景符合学校与平台的相关规定。
