@@ -337,11 +337,13 @@ def require_token(x_web_token: Optional[str] = Header(default=None)):
 app = FastAPI(title="今日校园自动签到", docs_url="/api/docs", redoc_url=None)
 
 @app.get("/", response_class=FileResponse)
-def index(_t: None = Depends(require_token)):
+def index():
+    # 放开静态页鉴权：页面本身不含敏感数据，需先可加载才能弹出令牌输入框
     return FileResponse(INDEX_HTML)
 
 @app.get("/school_list.js")
-def school_list_js(_t: None = Depends(require_token)):
+def school_list_js():
+    # 同上：院校列表为公开数据，不校验令牌
     return FileResponse(STATIC_DIR / "school_list.js", media_type="application/javascript")
 
 @app.get("/api/status")
