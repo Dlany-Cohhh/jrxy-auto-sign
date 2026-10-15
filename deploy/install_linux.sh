@@ -30,9 +30,9 @@ fi
 echo "[2/6] 安装系统依赖 libgomp1（ddddocr/onnxruntime 运行所需）..."
 if command -v apt-get >/dev/null 2>&1; then
   if [ "$(id -u)" -ne 0 ]; then
-    sudo apt-get install -y libgomp1 >/dev/null 2>&1 || echo "    [警告] libgomp1 安装失败，可稍后手动: sudo apt-get install -y libgomp1"
+    sudo apt-get install -y libgomp1 || echo "    [警告] libgomp1 安装失败，可稍后手动: sudo apt-get install -y libgomp1"
   else
-    apt-get install -y libgomp1 >/dev/null 2>&1 || echo "    [警告] libgomp1 安装失败，可稍后手动安装"
+    apt-get install -y libgomp1 || echo "    [警告] libgomp1 安装失败，可稍后手动安装"
   fi
 else
   echo "    [警告] 未检测到 apt，请自行安装 libgomp（dnf/yum: libgomp；openEuler: gcc-gfortran）"
