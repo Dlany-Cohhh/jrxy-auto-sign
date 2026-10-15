@@ -12,6 +12,8 @@ if not exist "%ROOT%\jrxy-engine\.venv" (
 echo [2/4] Installing engine dependencies (large, incl. OCR libs, a few minutes)...
 "%ROOT%\jrxy-engine\.venv\Scripts\python.exe" -m pip install -q --upgrade pip
 "%ROOT%\jrxy-engine\.venv\Scripts\python.exe" -m pip install -q -r "%ROOT%\jrxy-engine\requirements.txt" || goto :fail
+rem 本地验证码识别（Windows 桌面内存充足，默认安装；512MB 以下设备请删掉下行）
+"%ROOT%\jrxy-engine\.venv\Scripts\python.exe" -m pip install -q ddddocr || goto :fail
 echo [3/4] Creating web venv (web-server\.venv)...
 if not exist "%ROOT%\web-server\.venv" (
   python -m venv "%ROOT%\web-server\.venv" || goto :fail
