@@ -22,7 +22,6 @@
 │   └── jrxy-web.service      # systemd 单元
 ├── Dockerfile                # Linux 服务器容器化
 ├── docker-compose.yml        # 容器一键编排
-└── auto-sign/                # 已失效原仓库（仅供存档，不参与部署）
 ```
 
 ---
