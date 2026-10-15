@@ -99,6 +99,10 @@
   .hico svg{width:15px;height:15px}
   .panel h2 .tag{font-size:11px;color:var(--muted);font-weight:400;flex-basis:100%;margin-left:36px}
   .panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .school-drop{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:220px;overflow:auto;list-style:none;margin:0;padding:4px;background:#232733;border:1px solid #3a4152;border-radius:8px;z-index:50;display:none}
+  .school-drop li{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .school-drop li:hover{background:rgba(255,255,255,.08)}
+  .school-drop .sd-empty{padding:7px 10px;color:var(--muted);font-size:12px;cursor:default}
   .panel-head h2{margin:0;display:flex;align-items:center;gap:8px}
 
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
@@ -322,7 +326,12 @@
       <h4>基础信息</h4>
       <div class="sm-group">
         <div class="row">
-          <div class="field"><label>学校名称</label><input type="text" id="psSchool" placeholder="学校全称"></div>
+          <div class="field"><label>学校名称（输入关键字搜索，或直接输入）</label>
+            <div style="position:relative" id="psSchoolWrap">
+              <input type="text" id="psSchool" placeholder="如 韩山" autocomplete="off">
+              <ul class="school-drop" id="schoolDrop"></ul>
+            </div>
+          </div>
           <div class="field"><label>任务类型</label>
             <select id="psType">
               <option value="0">0 收集</option>
@@ -376,6 +385,7 @@
   </div>
 </div>
 
+<script src="school_list.js"></script>
 <script>
 const LS_KEY = "jrxy_web_token";
 let token = localStorage.getItem(LS_KEY) || "";
@@ -593,6 +603,30 @@ async function clearLogs(){
     refreshAll();
   }catch(e){ toast("清除失败：" + e.message, "bad"); }
 }
+function hideSchoolDrop(){ const ul = el("schoolDrop"); if (ul) ul.style.display = "none"; }
+function renderSchoolDrop(q){
+  const ul = el("schoolDrop");
+  if (!ul) return;
+  if (!q){ ul.innerHTML = ""; ul.style.display = "none"; return; }
+  const hits = (window.SCHOOL_LIST || []).filter(s => s.includes(q)).slice(0, 30);
+  if (!hits.length){
+    ul.innerHTML = '<li class="sd-empty">未找到匹配院校，可直接手动输入</li>';
+    ul.style.display = "block"; return;
+  }
+  ul.innerHTML = hits.map(s => '<li data-s="' + s + '">' + s + "</li>").join("");
+  ul.style.display = "block";
+  ul.querySelectorAll("li[data-s]").forEach(li => {
+    li.addEventListener("click", () => { el("psSchool").value = li.dataset.s; hideSchoolDrop(); });
+  });
+}
+let schoolTimer = null;
+el("psSchool").addEventListener("input", () => {
+  clearTimeout(schoolTimer);
+  schoolTimer = setTimeout(() => renderSchoolDrop(el("psSchool").value.trim()), 150);
+});
+el("psSchool").addEventListener("focus", () => renderSchoolDrop(el("psSchool").value.trim()));
+el("psSchool").addEventListener("keydown", e => { if (e.key === "Escape") hideSchoolDrop(); });
+document.addEventListener("click", e => { if (!e.target.closest("#psSchoolWrap")) hideSchoolDrop(); });
 async function testLogin(){
   const btn = document.querySelector('button[onclick="testLogin()"]');
   const oldTxt = btn.textContent;

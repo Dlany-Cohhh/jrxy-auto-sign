@@ -309,6 +309,10 @@ app = FastAPI(title="今日校园自动签到", docs_url="/api/docs", redoc_url=
 def index(_t: None = Depends(require_token)):
     return FileResponse(INDEX_HTML)
 
+@app.get("/school_list.js")
+def school_list_js(_t: None = Depends(require_token)):
+    return FileResponse(STATIC_DIR / "school_list.js", media_type="application/javascript")
+
 @app.get("/api/status")
 def api_status(_t: None = Depends(require_token)):
     e = effective_info()
