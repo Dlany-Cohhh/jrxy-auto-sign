@@ -10,6 +10,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERVICE_NAME="jrxy-web"
 INSTALL_PATH="/opt/jrxy-sign"
 RUN_USER="www-data"
+# pip 国内镜像源（默认清华 TUNA；如需换源改这里即可，如阿里云 https://mirrors.aliyun.com/pypi/simple/）
+PIP_INDEX="-i https://pypi.tuna.tsinghua.edu.cn/simple"
 
 echo "[1/6] 检查 Python 3.9+ ..."
 if ! command -v python3 >/dev/null 2>&1; then
@@ -38,16 +40,16 @@ fi
 
 echo "[3/6] 创建引擎虚拟环境并安装依赖（含 OCR 库，较大，需几分钟）..."
 python3 -m venv "$ROOT/jrxy-engine/.venv"
-"$ROOT/jrxy-engine/.venv/bin/pip" install --upgrade pip
+"$ROOT/jrxy-engine/.venv/bin/pip" install $PIP_INDEX --upgrade pip
 # PyYAML>=6.0 与 urllib3==1.26.20 已在 requirements.txt 固定，兼容 Python 3.12
-"$ROOT/jrxy-engine/.venv/bin/pip" install -r "$ROOT/jrxy-engine/requirements.txt"
+"$ROOT/jrxy-engine/.venv/bin/pip" install $PIP_INDEX -r "$ROOT/jrxy-engine/requirements.txt"
 # 本地验证码识别（默认安装，无需腾讯云密钥；内存 <512MB 的设备请删除下行避免 OOM）
-"$ROOT/jrxy-engine/.venv/bin/pip" install ddddocr
+"$ROOT/jrxy-engine/.venv/bin/pip" install $PIP_INDEX ddddocr
 
 echo "[4/6] 创建 Web 虚拟环境并安装依赖..."
 python3 -m venv "$ROOT/web-server/.venv"
-"$ROOT/web-server/.venv/bin/pip" install --upgrade pip
-"$ROOT/web-server/.venv/bin/pip" install -r "$ROOT/web-server/requirements.txt"
+"$ROOT/web-server/.venv/bin/pip" install $PIP_INDEX --upgrade pip
+"$ROOT/web-server/.venv/bin/pip" install $PIP_INDEX -r "$ROOT/web-server/requirements.txt"
 
 echo "[5/6] 可选：安装为 systemd 服务？"
 read -r -p "是否安装为 systemd 服务并开机自启? [y/N] " ans
