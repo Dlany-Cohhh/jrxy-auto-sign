@@ -516,7 +516,7 @@ async function saveSchedule(){
 async function loadSettings(){
   try{
     const s = await api("/api/settings");
-    el("psSchool").value = "";
+    el("psSchool").value = s.schoolName || "";
     el("psType").value = String(s.type);
     el("psProxy").value = s.httpProxy || "";
     el("psLon").value = (s.lon == null) ? "" : s.lon;
