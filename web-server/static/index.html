@@ -304,9 +304,10 @@
       <div class="row">
         <div class="field"><label>学号（用户名）</label><input type="text" id="psUser" autocomplete="username" placeholder="请输入学号"></div>
         <div class="field"><label>密码</label><input type="password" id="psPass" autocomplete="new-password" placeholder="留空则保持原密码"></div>
+        <button class="ghost" onclick="testLogin()">测试登录</button>
         <button class="ghost" onclick="clearCreds()">清除已保存账号</button>
       </div>
-      <div class="row"><span class="tag" id="credState"></span></div>
+      <div class="row"><span class="pill def" id="loginTestState">未测试</span><span class="tag" id="credState"></span></div>
       <div class="hint" id="credHint"></div>
 
       <h4>引擎配置（保存即写入 config.yml）</h4>
@@ -541,6 +542,31 @@ async function loadCreds(){
       (c.password_set ? " · 密码已设置" : "");
     el("credHint").textContent = c.note || "";
   }catch(e){ if (e.message !== "unauthorized") toast("账号状态加载失败：" + e.message, "bad"); }
+}
+async function testLogin(){
+  const btn = document.querySelector('button[onclick="testLogin()"]');
+  const oldTxt = btn.textContent;
+  const st = el("loginTestState");
+  btn.disabled = true; btn.textContent = "测试中…";
+  st.className = "pill def"; st.textContent = "正在执行登录测试（CAS 登录，不签到）…";
+  try{
+    const r = await api("/api/test-login", {method:"POST", body:"{}"});
+    if (r.ok){
+      st.className = "pill ok";
+      st.textContent = "登录成功" + (r.host ? " · " + r.host.replace(/^https?:\/\//,"").replace(/\/+$/,"") : "");
+      toast("登录成功（仅测试，未签到）", "ok");
+    }else{
+      st.className = "pill bad";
+      st.textContent = "登录失败：" + String(r.error || "").slice(0, 60);
+      toast("登录失败：" + String(r.error || "").slice(0, 80), "bad");
+    }
+  }catch(e){
+    st.className = "pill bad";
+    st.textContent = "测试异常：" + e.message.slice(0, 60);
+    toast("测试异常：" + e.message, "bad");
+  }finally{
+    btn.disabled = false; btn.textContent = oldTxt;
+  }
 }
 async function clearCreds(){
   if (!confirm("确定清除 Web 保存的学号/密码？清除后将回退使用 config.yml 中的账号。")) return;

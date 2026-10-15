@@ -56,6 +56,7 @@ IS_WIN = os.name == "nt"
 ENGINE_PY = ENGINE_DIR / (".venv/Scripts/python.exe" if IS_WIN else ".venv/bin/python")
 SUBMIT_SCRIPT = ENGINE_DIR / "scripts" / "merged_ios_v4_submit.py"
 RANGE_SCRIPT = ENGINE_DIR / "scripts" / "fetch_sign_range.py"
+TESTLOGIN_SCRIPT = ENGINE_DIR / "scripts" / "test_login.py"
 
 # ---------------- 运行配置（环境变量） ----------------
 HOST = os.getenv("HOST", "127.0.0.1")
@@ -444,6 +445,45 @@ def api_set_settings(body: dict, _t: None = Depends(require_token)):
         "lon": lon, "lat": lat, "address": address,
         "abnormalReason": abnormalReason, "photo": photo, "checkTitle": checkTitle,
         "username": mask_username(u.get("username", "")), "password_set": bool(u.get("password"))}}
+
+@app.post("/api/test-login")
+def api_test_login(_t: None = Depends(require_token)):
+    """登录连通性测试：仅执行 CAS 登录，不查询任务、不提交签到。"""
+    if not ENGINE_PY.exists():
+        raise HTTPException(status_code=500, detail="引擎虚拟环境不存在: %s" % ENGINE_PY)
+    if not TESTLOGIN_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail="引擎脚本不存在: %s" % TESTLOGIN_SCRIPT)
+    cmd = [str(ENGINE_PY), "-W", "ignore", str(TESTLOGIN_SCRIPT)]
+    env = dict(os.environ)
+    env.update(creds_env())   # Web 保存的账号密码优先，无则回退 config.yml
+    try:
+        r = subprocess.run(cmd, cwd=str(ENGINE_DIR), capture_output=True, text=True,
+                           timeout=60, encoding="utf-8", errors="replace", env=env)
+    except subprocess.TimeoutExpired:
+        save_log("登录测试", "测试超时", "执行超时（60 秒）")
+        raise HTTPException(status_code=504, detail="登录测试超时（60 秒）")
+    except Exception as e:
+        save_log("登录测试", "测试异常", str(e)[:200])
+        raise HTTPException(status_code=500, detail="登录测试异常: %s" % e)
+    payload = None
+    for line in (r.stdout or "").splitlines():
+        if line.startswith("###LOGIN###"):
+            try:
+                payload = json.loads(line[len("###LOGIN###"):].strip())
+            except Exception:
+                payload = None
+            break
+    if not payload:
+        err = (r.stderr or r.stdout or "").strip()[-300:]
+        save_log("登录测试", "测试失败", err[:200])
+        raise HTTPException(status_code=502, detail="无法解析结果: %s" % err)
+    if payload.get("ok"):
+        save_log("登录测试", "登录成功",
+                 "host=%s cookies=%s" % (payload.get("host"), ",".join(payload.get("cookies") or [])))
+    else:
+        save_log("登录测试", "登录失败", str(payload.get("error"))[:200])
+    return {"ok": bool(payload.get("ok")), "host": payload.get("host", ""),
+            "cookies": payload.get("cookies", []), "error": payload.get("error")}
 
 @app.post("/api/config")
 def api_config(body: dict, _t: None = Depends(require_token)):
