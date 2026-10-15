@@ -25,6 +25,7 @@
     Web 保存时的兜底（豆包定时任务直连引擎时仍用 config.yml）。
   - 坐标/地址修改优先写入 data/override.json（命令行参数覆盖），不改动 config.yml 注释结构。
 """
+import base64
 import json
 import logging
 import os
@@ -101,6 +102,10 @@ def fetch_logs(limit: int = 50):
         return [dict(r) for r in rows]
     except Exception:
         return []
+
+def clear_logs():
+    with sqlite3.connect(DB_PATH) as c:
+        c.execute("DELETE FROM sign_log")
 
 # ---------------- 配置读写 ----------------
 def load_engine_config():
@@ -484,6 +489,35 @@ def api_test_login(_t: None = Depends(require_token)):
         save_log("登录测试", "登录失败", str(payload.get("error"))[:200])
     return {"ok": bool(payload.get("ok")), "host": payload.get("host", ""),
             "cookies": payload.get("cookies", []), "error": payload.get("error")}
+
+@app.post("/api/photo")
+def api_photo(body: dict, _t: None = Depends(require_token)):
+    """上传签到照片：保存到引擎根目录，photo 字段写入相对文件名。"""
+    name = os.path.basename(str(body.get("name", "")).strip())
+    data = str(body.get("data", ""))
+    if not name or not data:
+        raise HTTPException(status_code=400, detail="缺少文件名或图片数据")
+    if not name.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
+        raise HTTPException(status_code=400, detail="仅支持 jpg/png/webp/gif 图片")
+    try:
+        raw = base64.b64decode(data.split(",")[-1])
+    except Exception:
+        raise HTTPException(status_code=400, detail="图片数据解码失败")
+    if not raw:
+        raise HTTPException(status_code=400, detail="图片内容为空")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="图片不能超过 5MB")
+    target = ENGINE_DIR / name
+    target.write_bytes(raw)
+    save_log("照片上传", "签到照片已上传", "file=%s size=%dB" % (name, len(raw)))
+    return {"ok": True, "photo": name, "size": len(raw)}
+
+@app.post("/api/logs/clear")
+def api_logs_clear(_t: None = Depends(require_token)):
+    """清空运行日志（Web 手动清除）。"""
+    clear_logs()
+    save_log("日志管理", "日志已清空", "由 Web 页面手动清除")
+    return {"ok": True}
 
 @app.post("/api/config")
 def api_config(body: dict, _t: None = Depends(require_token)):

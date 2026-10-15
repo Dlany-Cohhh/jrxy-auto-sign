@@ -271,7 +271,7 @@
   </div>
 
   <div class="panel">
-    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>运行日志 <span class="tag">最近记录（最多 200 条）</span></h2>
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>运行日志 <span class="tag">最近记录（最多 200 条）</span><button class="ghost" onclick="clearLogs()" style="margin-left:8px">清除日志</button></h2>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th style="width:150px">时间</th><th style="width:110px">类型</th><th style="width:150px">结果</th><th>详情</th></tr></thead>
@@ -344,7 +344,13 @@
       <div class="sm-group">
         <div class="row">
           <div class="field"><label>异常原因（无则留空）</label><input type="text" id="psAbn" placeholder="如 信号异常"></div>
-          <div class="field"><label>签到照片文件名（可选）</label><input type="text" id="psPhoto" placeholder="如 daka.jpg"></div>
+          <div class="field"><label>签到照片（可选）</label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="psPhoto" placeholder="选择或输入文件名，如 daka.jpg" style="flex:1">
+              <button class="ghost" type="button" onclick="el('psPhotoFile').click()">浏览…</button>
+              <input type="file" id="psPhotoFile" accept="image/*" style="display:none">
+            </div>
+          </div>
           <div class="field"><label>表单标题校验</label>
             <select id="psTitle">
               <option value="0">0 不校验</option>
@@ -552,6 +558,35 @@ async function loadCreds(){
     el("credHint").textContent = c.note || "";
   }catch(e){ if (e.message !== "unauthorized") toast("账号状态加载失败：" + e.message, "bad"); }
 }
+async function uploadPhoto(ev){
+  const fi = ev.target;
+  const f = fi.files && fi.files[0];
+  if (!f) return;
+  if (f.size > 5 * 1024 * 1024){ toast("图片不能超过 5MB", "bad"); fi.value = ""; return; }
+  const ext = (f.name.split(".").pop() || "").toLowerCase();
+  if (!["jpg","jpeg","png","webp","gif"].includes(ext)){ toast("仅支持 jpg/png/webp/gif 图片", "bad"); fi.value = ""; return; }
+  toast("正在上传 " + f.name + " …", "ok");
+  try{
+    const data = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = () => rej(new Error("读取文件失败"));
+      r.readAsDataURL(f);
+    });
+    const r = await api("/api/photo", {method:"POST", body:JSON.stringify({name: f.name, data})});
+    el("psPhoto").value = r.photo;
+    toast("照片已上传：" + r.photo + "（" + Math.max(1, Math.round(r.size / 1024)) + " KB）", "ok");
+  }catch(e){ toast("上传失败：" + e.message, "bad"); }
+  finally{ fi.value = ""; }
+}
+async function clearLogs(){
+  if (!confirm("确定清空全部运行日志？此操作不可恢复。")) return;
+  try{
+    await api("/api/logs/clear", {method:"POST", body:"{}"});
+    toast("运行日志已清空", "ok");
+    refreshAll();
+  }catch(e){ toast("清除失败：" + e.message, "bad"); }
+}
 async function testLogin(){
   const btn = document.querySelector('button[onclick="testLogin()"]');
   const oldTxt = btn.textContent;
@@ -628,6 +663,7 @@ loadCreds();
 loadSettings();
 document.addEventListener("keydown", e=>{ if (e.key === "Escape") closeSettings(); });
 el("settingsMask").addEventListener("click", e=>{ if (e.target === el("settingsMask")) closeSettings(); });
+el("psPhotoFile").addEventListener("change", uploadPhoto);
 setInterval(()=>{ api("/api/status").then(renderStatus).catch(()=>{}); }, 60000);
 setInterval(()=>{ api("/api/logs?limit=50").then(lg=>renderLogs(lg.logs)).catch(()=>{}); }, 30000);
 </script>

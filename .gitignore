@@ -28,3 +28,10 @@ Thumbs.db
 web-ui-*.png
 _shots/
 web-server/static/_shots/
+
+# ===== 签到照片（Web 上传到引擎根目录，可能含个人图像）=====
+jrxyzuixingnx/*.jpg
+jrxyzuixingnx/*.jpeg
+jrxyzuixingnx/*.png
+jrxyzuixingnx/*.webp
+jrxyzuixingnx/*.gif
