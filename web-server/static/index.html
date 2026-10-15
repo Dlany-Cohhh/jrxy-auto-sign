@@ -201,6 +201,7 @@
   .settings-modal .sm-scroll{overflow-y:auto;padding:6px 24px 18px;flex:1}
   .settings-modal .sm-scroll h4{font-size:13px;color:var(--muted);margin:18px 0 10px;font-weight:600;display:flex;align-items:center;gap:8px;letter-spacing:.3px}
   .settings-modal .sm-scroll h4::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--info)}
+  .settings-modal .sm-group{background:rgba(255,255,255,.028);border:1px solid var(--line);border-radius:12px;padding:14px;margin:4px 0 8px}
   .settings-modal .sm-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--line)}
   .settings-modal .sm-foot .hint{flex:1;text-align:right;margin:0}
 
@@ -301,48 +302,58 @@
     </div>
     <div class="sm-scroll">
       <h4>账号</h4>
-      <div class="row">
-        <div class="field"><label>学号（用户名）</label><input type="text" id="psUser" autocomplete="username" placeholder="请输入学号"></div>
-        <div class="field"><label>密码</label><input type="password" id="psPass" autocomplete="new-password" placeholder="留空则保持原密码"></div>
-        <button class="ghost" onclick="testLogin()">测试登录</button>
-        <button class="ghost" onclick="clearCreds()">清除已保存账号</button>
+      <div class="sm-group">
+        <div class="row">
+          <div class="field"><label>学号（用户名）</label><input type="text" id="psUser" autocomplete="username" placeholder="请输入学号"></div>
+          <div class="field"><label>密码</label><input type="password" id="psPass" autocomplete="new-password" placeholder="留空则保持原密码"></div>
+          <button class="ghost" onclick="testLogin()">测试登录</button>
+          <button class="ghost" onclick="clearCreds()">清除已保存账号</button>
+        </div>
+        <div class="row"><span class="pill def" id="loginTestState">未测试</span><span class="tag" id="credState"></span></div>
+        <div class="hint" id="credHint"></div>
       </div>
-      <div class="row"><span class="pill def" id="loginTestState">未测试</span><span class="tag" id="credState"></span></div>
-      <div class="hint" id="credHint"></div>
 
-      <h4>引擎配置（保存即写入 config.yml）</h4>
-      <div class="row">
-        <div class="field"><label>学校名称</label><input type="text" id="psSchool" placeholder="学校全称"></div>
-        <div class="field"><label>任务类型</label>
-          <select id="psType">
-            <option value="0">0 收集</option>
-            <option value="1">1 签到</option>
-            <option value="2">2 查寝</option>
-            <option value="3">3 政工签到</option>
-            <option value="4">4 教师工作日志</option>
-          </select>
-        </div>
-        <div class="field"><label>HTTP 代理（可选）</label><input type="text" id="psProxy" placeholder="如 http://127.0.0.1:7890"></div>
-      </div>
-      <div class="row">
-        <div class="field"><label>经度 lon（GCJ-02）</label><input type="number" step="any" id="psLon"></div>
-        <div class="field"><label>纬度 lat（GCJ-02）</label><input type="number" step="any" id="psLat"></div>
-        <div class="field"><label>定位地址文本</label><input type="text" id="psAddr" placeholder="签到点地址"></div>
-      </div>
-      <div class="row">
-        <div class="field"><label>异常原因（无则留空）</label><input type="text" id="psAbn" placeholder="如 信号异常"></div>
-        <div class="field"><label>签到照片文件名（可选）</label><input type="text" id="psPhoto" placeholder="如 daka.jpg"></div>
-        <div class="field"><label>表单标题校验</label>
-          <select id="psTitle">
-            <option value="0">0 不校验</option>
-            <option value="1">1 校验</option>
-          </select>
+      <h4>基础信息</h4>
+      <div class="sm-group">
+        <div class="row">
+          <div class="field"><label>学校名称</label><input type="text" id="psSchool" placeholder="学校全称"></div>
+          <div class="field"><label>任务类型</label>
+            <select id="psType">
+              <option value="0">0 收集</option>
+              <option value="1">1 签到</option>
+              <option value="2">2 查寝</option>
+              <option value="3">3 政工签到</option>
+              <option value="4">4 教师工作日志</option>
+            </select>
+          </div>
+          <div class="field"><label>HTTP 代理（可选）</label><input type="text" id="psProxy" placeholder="如 http://127.0.0.1:7890"></div>
         </div>
       </div>
-      <div class="row">
-        <button class="primary" onclick="fetchSignRange()">从服务器获取签到范围</button>
-        <span class="hint" id="psCur" style="margin:0">当前账号 -</span>
+
+      <h4>签到定位</h4>
+      <div class="sm-group">
+        <div class="row">
+          <div class="field"><label>经度 lon（GCJ-02）</label><input type="number" step="any" id="psLon"></div>
+          <div class="field"><label>纬度 lat（GCJ-02）</label><input type="number" step="any" id="psLat"></div>
+          <div class="field"><label>定位地址文本</label><input type="text" id="psAddr" placeholder="签到点地址"></div>
+          <button class="primary" onclick="fetchSignRange()">从服务器获取签到范围</button>
+        </div>
       </div>
+
+      <h4>高级选项</h4>
+      <div class="sm-group">
+        <div class="row">
+          <div class="field"><label>异常原因（无则留空）</label><input type="text" id="psAbn" placeholder="如 信号异常"></div>
+          <div class="field"><label>签到照片文件名（可选）</label><input type="text" id="psPhoto" placeholder="如 daka.jpg"></div>
+          <div class="field"><label>表单标题校验</label>
+            <select id="psTitle">
+              <option value="0">0 不校验</option>
+              <option value="1">1 校验</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="hint" id="psHint"></div>
     </div>
     <div class="sm-foot">
@@ -494,8 +505,6 @@ async function loadSettings(){
     el("psTitle").value = String(s.checkTitle || 0);
     el("psUser").value = "";
     el("psPass").value = "";
-    el("psCur").textContent = "当前账号 " + (s.username ? s.username : "未配置") +
-      (s.password_set ? " · 密码已设置" : " · 密码未设置");
     el("psHint").textContent = "已读取 config.yml 当前值；学号/密码留空表示不改动，密码不在此界面回显。";
   }catch(e){ if (e.message !== "unauthorized") toast("设置加载失败：" + e.message, "bad"); }
 }
