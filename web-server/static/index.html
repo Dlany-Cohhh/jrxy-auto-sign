@@ -328,7 +328,7 @@
         <div class="row">
           <div class="field"><label>学校名称（输入关键字搜索，或直接输入）</label>
             <div style="position:relative" id="psSchoolWrap">
-              <input type="text" id="psSchool" placeholder="如 韩山" autocomplete="off">
+              <input type="text" id="psSchool" placeholder="如 XX大学" autocomplete="off">
               <ul class="school-drop" id="schoolDrop"></ul>
             </div>
           </div>
@@ -516,7 +516,7 @@ async function saveSchedule(){
 async function loadSettings(){
   try{
     const s = await api("/api/settings");
-    el("psSchool").value = s.schoolName || "";
+    el("psSchool").value = "";
     el("psType").value = String(s.type);
     el("psProxy").value = s.httpProxy || "";
     el("psLon").value = (s.lon == null) ? "" : s.lon;
@@ -527,7 +527,7 @@ async function loadSettings(){
     el("psTitle").value = String(s.checkTitle || 0);
     el("psUser").value = "";
     el("psPass").value = "";
-    el("psHint").textContent = "已读取 config.yml 当前值；学号/密码留空表示不改动，密码不在此界面回显。";
+    el("psHint").textContent = "已读取 config.yml 当前值；学号/密码/学校名称留空表示不改动，密码不在此界面回显。";
   }catch(e){ if (e.message !== "unauthorized") toast("设置加载失败：" + e.message, "bad"); }
 }
 async function saveSettingsAll(){

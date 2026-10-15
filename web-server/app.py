@@ -390,7 +390,7 @@ def api_set_settings(body: dict, _t: None = Depends(require_token)):
 
     schoolName = str(body.get("schoolName", "")).strip()
     if not schoolName:
-        raise HTTPException(status_code=400, detail="学校名称不能为空")
+        schoolName = u.get("schoolName", "")  # 留空 = 保持原值（不在界面回显真实校名）
 
     try:
         typ = int(body.get("type", u.get("type", 2)))
