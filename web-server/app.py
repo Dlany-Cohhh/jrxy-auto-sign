@@ -353,6 +353,98 @@ def api_set_credentials(body: dict, _t: None = Depends(require_token)):
     return {"ok": True, "source": "web" if (username and password) else "config",
             "username": mask_username(username)}
 
+@app.get("/api/settings")
+def api_get_settings(_t: None = Depends(require_token)):
+    """返回 config.yml 全部用户级设置（密码只返回是否已设置）。"""
+    u = user_config()
+    cfg = load_engine_config()
+    return {
+        "schoolName": u.get("schoolName", ""),
+        "type": u.get("type", 2),
+        "httpProxy": cfg.get("httpProxy", ""),
+        "lon": u.get("lon"),
+        "lat": u.get("lat"),
+        "address": u.get("address", ""),
+        "abnormalReason": u.get("abnormalReason", ""),
+        "photo": u.get("photo", ""),
+        "checkTitle": u.get("checkTitle", 0),
+        "username": mask_username(u.get("username", "")),
+        "password_set": bool(u.get("password")),
+    }
+
+@app.post("/api/settings")
+def api_set_settings(body: dict, _t: None = Depends(require_token)):
+    """保存 config.yml 全部用户级设置；账号/密码留空则保持原值；坐标与账号同步覆盖层。"""
+    cfg = load_engine_config()
+    u = cfg["users"][0]["user"]
+
+    schoolName = str(body.get("schoolName", "")).strip()
+    if not schoolName:
+        raise HTTPException(status_code=400, detail="学校名称不能为空")
+
+    try:
+        typ = int(body.get("type", u.get("type", 2)))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="任务类型必须是 0~4 的整数")
+    if typ not in (0, 1, 2, 3, 4):
+        raise HTTPException(status_code=400, detail="任务类型仅支持 0收集/1签到/2查寝/3政工/4日志")
+
+    lon, lat = body.get("lon"), body.get("lat")
+    try:
+        lon = float(lon) if lon is not None and str(lon).strip() != "" else u.get("lon")
+        lat = float(lat) if lat is not None and str(lat).strip() != "" else u.get("lat")
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="经度/纬度必须是数字")
+    if lon is not None and not (-180 <= lon <= 180):
+        raise HTTPException(status_code=400, detail="经度范围 -180 ~ 180")
+    if lat is not None and not (-90 <= lat <= 90):
+        raise HTTPException(status_code=400, detail="纬度范围 -90 ~ 90")
+
+    httpProxy = str(body.get("httpProxy", cfg.get("httpProxy", ""))).strip()
+    address = str(body.get("address", u.get("address", ""))).strip()
+    abnormalReason = str(body.get("abnormalReason", u.get("abnormalReason", ""))).strip()
+    photo = str(body.get("photo", u.get("photo", ""))).strip()
+    try:
+        checkTitle = int(body.get("checkTitle", u.get("checkTitle", 0)) or 0)
+    except (TypeError, ValueError):
+        checkTitle = 0
+
+    # 账号：用户名非空才更新；密码留空则保持原密码
+    username = str(body.get("username", "")).strip()
+    password = str(body.get("password", ""))
+    if username:
+        u["username"] = username
+        u["password"] = password if password else u.get("password", "")
+
+    u["schoolName"] = schoolName
+    u["type"] = typ
+    u["lon"] = lon
+    u["lat"] = lat
+    u["address"] = address
+    u["abnormalReason"] = abnormalReason
+    u["photo"] = photo
+    u["checkTitle"] = checkTitle
+    cfg["httpProxy"] = httpProxy
+
+    with open(ENGINE_DIR / "config.yml", "w", encoding="utf-8") as f:
+        yaml.dump(cfg, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
+
+    # 同步覆盖层，保持运行时优先级一致（Web 账号优先、坐标覆盖优先）
+    ov = load_override()
+    if lon is not None and lat is not None and address:
+        ov["lon"], ov["lat"], ov["address"] = lon, lat, address
+        save_override(ov)
+    if username and password:
+        save_creds(username, password)
+
+    save_log("个人设置", "引擎配置已保存",
+             "school=%s type=%s proxy=%s" % (schoolName, typ, httpProxy or "(无)"))
+    return {"ok": True, "config": {
+        "schoolName": schoolName, "type": typ, "httpProxy": httpProxy,
+        "lon": lon, "lat": lat, "address": address,
+        "abnormalReason": abnormalReason, "photo": photo, "checkTitle": checkTitle,
+        "username": mask_username(u.get("username", "")), "password_set": bool(u.get("password"))}}
+
 @app.post("/api/config")
 def api_config(body: dict, _t: None = Depends(require_token)):
     lon, lat = body.get("lon"), body.get("lat")
