@@ -98,6 +98,8 @@
   }
   .hico svg{width:15px;height:15px}
   .panel h2 .tag{font-size:11px;color:var(--muted);font-weight:400;flex-basis:100%;margin-left:36px}
+  .panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .panel-head h2{margin:0;display:flex;align-items:center;gap:8px}
 
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
   .field{display:flex;flex-direction:column;gap:6px;flex:1 1 180px;min-width:0}
@@ -271,7 +273,11 @@
   </div>
 
   <div class="panel">
-    <h2 style="display:flex;align-items:center;gap:8px"><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>运行日志 <span class="tag">最近记录（最多 200 条）</span><button class="ghost" onclick="clearLogs()" style="margin-left:auto">清除日志</button></h2>
+    <div class="panel-head">
+      <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>运行日志</h2>
+      <span class="tag" style="margin:0">最近记录（最多 200 条）</span>
+      <button class="ghost" onclick="clearLogs()" style="margin-left:auto">清除日志</button>
+    </div>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th style="width:150px">时间</th><th style="width:110px">类型</th><th style="width:150px">结果</th><th>详情</th></tr></thead>
