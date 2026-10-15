@@ -52,30 +52,39 @@ python3 -m venv "$ROOT/web-server/.venv"
 "$ROOT/web-server/.venv/bin/pip" install $PIP_INDEX -r "$ROOT/web-server/requirements.txt"
 
 echo "[5/6] 可选：安装为 systemd 服务？"
-read -r -p "是否安装为 systemd 服务并开机自启? [y/N] " ans
-if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-  if [ "$(id -u)" -ne 0 ]; then echo "需要 root 权限安装 systemd 服务，请用 sudo 重跑"; exit 1; fi
-  mkdir -p "$INSTALL_PATH"
-  # 复制引擎与 Web 服务
-  cp -r "$ROOT/jrxy-engine" "$INSTALL_PATH/"
-  cp -r "$ROOT/web-server" "$INSTALL_PATH/"
-  cp "$ROOT/README-部署手册.md" "$INSTALL_PATH/" 2>/dev/null || true
-  # 运行用户：确保 www-data 存在并赋予项目目录权限
-  if ! id -u "$RUN_USER" >/dev/null 2>&1; then
-    useradd -r -s /usr/sbin/nologin "$RUN_USER"
-    echo "    已创建运行用户: $RUN_USER"
+if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running >/dev/null 2>&1; then
+  read -r -p "是否安装为 systemd 服务并开机自启? [y/N] " ans
+  if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
+    if [ "$(id -u)" -ne 0 ]; then echo "需要 root 权限安装 systemd 服务，请用 sudo 重跑"; exit 1; fi
+    mkdir -p "$INSTALL_PATH"
+    # 复制引擎与 Web 服务
+    cp -r "$ROOT/jrxy-engine" "$INSTALL_PATH/"
+    cp -r "$ROOT/web-server" "$INSTALL_PATH/"
+    cp "$ROOT/README-部署手册.md" "$INSTALL_PATH/" 2>/dev/null || true
+    # 运行用户：确保 www-data 存在并赋予项目目录权限
+    if ! id -u "$RUN_USER" >/dev/null 2>&1; then
+      useradd -r -s /usr/sbin/nologin "$RUN_USER"
+      echo "    已创建运行用户: $RUN_USER"
+    fi
+    chown -R "$RUN_USER:$RUN_USER" "$INSTALL_PATH"
+    echo "    已授权 $RUN_USER 访问 $INSTALL_PATH"
+    # 用绝对路径生成 systemd 单元
+    sed "s|/opt/jrxy-sign|$INSTALL_PATH|g" "$ROOT/deploy/jrxy-web.service" > /etc/systemd/system/jrxy-web.service
+    systemctl daemon-reload
+    systemctl enable jrxy-web
+    systemctl start jrxy-web
+    echo "systemd 服务已启动: systemctl status jrxy-web"
+  else
+    echo "跳过 systemd 安装。手动启动方式:"
+    echo "  cd $ROOT/web-server && .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000"
   fi
-  chown -R "$RUN_USER:$RUN_USER" "$INSTALL_PATH"
-  echo "    已授权 $RUN_USER 访问 $INSTALL_PATH"
-  # 用绝对路径生成 systemd 单元
-  sed "s|/opt/jrxy-sign|$INSTALL_PATH|g" "$ROOT/deploy/jrxy-web.service" > /etc/systemd/system/jrxy-web.service
-  systemctl daemon-reload
-  systemctl enable jrxy-web
-  systemctl start jrxy-web
-  echo "systemd 服务已启动: systemctl status jrxy-web"
 else
-  echo "跳过 systemd 安装。手动启动方式:"
-  echo "  cd $ROOT/web-server && .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000"
+  echo "    [提示] 当前环境无 systemd（容器/精简环境），自动改为后台启动。"
+  cd "$ROOT/web-server"
+  nohup .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000 > /tmp/jrxy-web.log 2>&1 &
+  echo "    服务已后台启动: http://127.0.0.1:8000  (日志: /tmp/jrxy-web.log)"
+  echo "    如需开机自启（容器重启后生效）: crontab -e 添加"
+  echo "      @reboot cd $ROOT/web-server && nohup .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000 >> /tmp/jrxy-web.log 2>&1"
 fi
 
 echo "[6/6] 完成。浏览器打开 http://127.0.0.1:8000"
