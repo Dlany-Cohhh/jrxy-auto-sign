@@ -108,9 +108,40 @@ def clear_logs():
         c.execute("DELETE FROM sign_log")
 
 # ---------------- 配置读写 ----------------
+# 默认占位 config.yml（零真实信息）：首次启动自动生成，真实信息在 Web 设置中填写后写回。
+# 该文件已在 .gitignore 中，永不入库。
+DEFAULT_ENGINE_CONFIG = """notifyOption:
+    method: 0
+    mailApiUrl: ''
+ocrOption:
+    SecretId: ''
+    SecretKey: ''
+httpProxy: ''
+users:
+    - user:
+        type: 2
+        schoolName: ''
+        username: ''
+        password: ''
+        address: ''
+        lon: 0.0
+        lat: 0.0
+        abnormalReason: ''
+        photo: ''
+        checkTitle: 0
+"""
+
+def ensure_engine_config():
+    """config.yml 不存在时自动生成占位版（解决全新部署无配置导致 500）。"""
+    p = ENGINE_DIR / "config.yml"
+    if not p.exists():
+        p.write_text(DEFAULT_ENGINE_CONFIG, encoding="utf-8")
+        print(f"[init] 已自动生成 {p}（占位配置，请在 Web 管理台「设置」填写真实信息）")
+    return p
+
 def load_engine_config():
-    """读取引擎 config.yml（只读）。"""
-    with open(ENGINE_DIR / "config.yml", encoding="utf-8") as f:
+    """读取引擎 config.yml（只读；不存在则自动生成占位版）。"""
+    with open(ensure_engine_config(), encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 def user_config():
