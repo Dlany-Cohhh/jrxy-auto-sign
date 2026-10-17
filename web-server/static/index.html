@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>今日校园自动签到 · 管理台</title>
+<title>今日校园自动签到 · 多账号管理台</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='1' y='1' width='22' height='22' rx='7' fill='%230b1220'/%3E%3Cpath d='M6.8 12.4l3.4 3.4 7-7.2' stroke='%2314b8a6' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root{
@@ -99,11 +99,11 @@
   .hico svg{width:15px;height:15px}
   .panel h2 .tag{font-size:11px;color:var(--muted);font-weight:400;flex-basis:100%;margin-left:36px}
   .panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .panel-head h2{margin:0;display:flex;align-items:center;gap:8px}
   .school-drop{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:220px;overflow:auto;list-style:none;margin:0;padding:4px;background:#232733;border:1px solid #3a4152;border-radius:8px;z-index:50;display:none}
   .school-drop li{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .school-drop li:hover{background:rgba(255,255,255,.08)}
   .school-drop .sd-empty{padding:7px 10px;color:var(--muted);font-size:12px;cursor:default}
-  .panel-head h2{margin:0;display:flex;align-items:center;gap:8px}
 
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
   .field{display:flex;flex-direction:column;gap:6px;flex:1 1 180px;min-width:0}
@@ -132,6 +132,7 @@
   button:active{transform:translateY(1px)}
   button:focus-visible{outline:2px solid var(--info);outline-offset:2px}
   button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  button.small{padding:5px 10px;font-size:12px;border-radius:8px}
   button.primary{
     background:linear-gradient(135deg, var(--ac1), var(--ac2));
     border-color:transparent;color:#03130d;font-weight:700;
@@ -155,6 +156,7 @@
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
   th{color:var(--muted);font-weight:600;font-size:12px;background:rgba(255,255,255,.02);letter-spacing:.2px}
   td.detail{color:var(--muted);max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  td.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all}
   .tbl-scroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:11px}
   .tbl-scroll::-webkit-scrollbar{width:9px;height:9px}
   .tbl-scroll::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
@@ -193,23 +195,16 @@
   }
   @keyframes spin{to{transform:rotate(360deg)}}
   .hint{color:var(--muted);font-size:12px;margin-top:8px;word-break:break-all}
-  .icon-btn{
-    width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-    background:var(--card2);border:1px solid var(--line);color:var(--muted);cursor:pointer;
-    transition:color .15s,border-color .15s,transform .18s;
-  }
-  .icon-btn:hover{color:var(--text);border-color:var(--info);transform:rotate(35deg)}
-  .icon-btn svg{width:19px;height:19px}
-  .settings-modal{width:min(780px,100%);max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden}
-  .settings-modal .sm-head{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--line);gap:12px}
-  .settings-modal .sm-head h3{margin:0;display:flex;align-items:center;gap:9px;font-size:16px}
-  .settings-modal .sm-head h3 svg{width:19px;height:19px;color:var(--info)}
-  .settings-modal .sm-scroll{overflow-y:auto;padding:6px 24px 18px;flex:1}
-  .settings-modal .sm-scroll h4{font-size:13px;color:var(--muted);margin:18px 0 10px;font-weight:600;display:flex;align-items:center;gap:8px;letter-spacing:.3px}
-  .settings-modal .sm-scroll h4::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--info)}
-  .settings-modal .sm-group{background:rgba(255,255,255,.028);border:1px solid var(--line);border-radius:12px;padding:14px;margin:4px 0 8px}
-  .settings-modal .sm-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--line)}
-  .settings-modal .sm-foot .hint{flex:1;text-align:right;margin:0}
+  .account-modal{width:min(860px,100%);max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden}
+  .account-modal .am-head{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--line);gap:12px}
+  .account-modal .am-head h3{margin:0;display:flex;align-items:center;gap:9px;font-size:16px}
+  .account-modal .am-head h3 svg{width:19px;height:19px;color:var(--info)}
+  .account-modal .am-scroll{overflow-y:auto;padding:6px 24px 18px;flex:1}
+  .account-modal .am-scroll h4{font-size:13px;color:var(--muted);margin:18px 0 10px;font-weight:600;display:flex;align-items:center;gap:8px;letter-spacing:.3px}
+  .account-modal .am-scroll h4::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--info)}
+  .account-modal .am-group{background:rgba(255,255,255,.028);border:1px solid var(--line);border-radius:12px;padding:14px;margin:4px 0 8px}
+  .account-modal .am-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--line)}
+  .account-modal .am-foot .hint{flex:1;text-align:right;margin:0}
 
   /* ===== 响应式（移动优先）===== */
   @media (min-width:560px){
@@ -217,7 +212,7 @@
     body{padding:24px}
   }
   @media (min-width:900px){
-    .cards{grid-template-columns:repeat(3,1fr)}
+    .cards{grid-template-columns:repeat(4,1fr)}
     header{flex-direction:row;align-items:center;justify-content:space-between}
     .wrap{max-width:1120px}
   }
@@ -232,38 +227,50 @@
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="7" fill="#0e1c33" stroke="#2c3f63"/><path d="M6.8 12.4l3.4 3.4 7-7.2" stroke="#14b8a6" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <div>
-        <h1>今日校园自动签到 · 管理台</h1>
-        <div class="sub">今日校园查寝/签到 · Web 管理界面</div>
+        <h1>今日校园自动签到 · 多账号管理台</h1>
+        <div class="sub">今日校园查寝/签到 · 账号配置与引擎均来自 accounts/ 目录（与批量脚本共用）</div>
       </div>
     </div>
     <div class="head-side">
-      <button class="icon-btn" id="settingsBtn" title="设置" onclick="openSettings()" aria-label="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3.1"/><path d="M12 3.2v2.3M12 18.5v2.3M3.2 12h2.3M18.5 12h2.3M5.8 5.8l1.6 1.6M16.6 16.6l1.6 1.6M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6" stroke-linecap="round"/></svg></button>
       <div class="badge" id="platformBadge"><span class="dot off" id="engineDot"></span><span id="engineText">连接中…</span></div>
       <div class="badge clock" id="clockBox" title="本机当前时间">--:--:--</div>
     </div>
   </header>
 
   <div class="cards" id="overviewCards">
-    <div class="card"><div class="k">学校</div><div class="v" id="cSchool">-</div></div>
-    <div class="card"><div class="k">账号</div><div class="v" id="cUser">-</div></div>
-    <div class="card"><div class="k">任务类型</div><div class="v" id="cType">-</div></div>
-    <div class="card"><div class="k">设备 ID（勿更换）</div><div class="v small" id="cDev">-</div></div>
-    <div class="card"><div class="k">当前坐标（GCJ-02）</div><div class="v small" id="cCoord">-</div></div>
-    <div class="card"><div class="k">内置定时</div><div class="v small" id="cSched">-</div></div>
+    <div class="card"><div class="k">运行平台</div><div class="v" id="cPlatform">-</div></div>
+    <div class="card"><div class="k">账号总数</div><div class="v" id="cCount">-</div></div>
+    <div class="card"><div class="k">内置定时（批量）</div><div class="v small" id="cSched">-</div></div>
+    <div class="card"><div class="k">服务器时间</div><div class="v small" id="cTime">-</div></div>
   </div>
 
   <div class="panel">
-    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>手动操作 <span class="tag">dry 只探测不提交；submit 会真实完成一次查寝签到</span></h2>
-    <div class="row">
-      <button class="ghost" id="btnDry" onclick="run('dry')">只探测（无副作用）</button>
-      <button class="primary" id="btnSubmit" onclick="run('submit')">立即签到（真实提交）</button>
-      <button class="ghost" onclick="refreshAll()">刷新状态</button>
+    <div class="panel-head">
+      <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>账号列表 <span class="tag" style="margin:0">每个账号独立配置与 deviceId · 已有绑定账号迁移时请填写原 deviceId</span></h2>
+      <button class="primary" onclick="openAccountModal('')" style="margin-left:auto">＋ 新增账号</button>
+      <button class="ghost" onclick="loadAccounts()">刷新列表</button>
     </div>
-    <div class="result" id="resultBox"></div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>名称</th><th>学校</th><th>账号</th><th>类型</th><th>坐标</th><th>deviceId</th><th style="width:210px">操作</th></tr></thead>
+        <tbody id="accountBody"><tr><td colspan="7" style="text-align:center;color:var(--muted)">加载中…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="result" id="resultBoxAcc"></div>
   </div>
 
   <div class="panel">
-    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 7.2V12l3.4 2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>内置定时签到 <span class="tag">服务器部署时的自足定时器（本机部署可同时保留豆包定时任务）</span></h2>
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>批量操作 <span class="tag">dry 只探测全部账号不提交；submit 会真实完成全部账号的一次签到</span></h2>
+    <div class="row">
+      <button class="ghost" id="btnBatchDry" onclick="batchRun('dry')">只探测全部（无副作用）</button>
+      <button class="primary" id="btnBatchSubmit" onclick="batchRun('submit')">签到全部（真实提交）</button>
+      <span class="tag" id="batchNote"></span>
+    </div>
+    <div class="result" id="resultBoxBatch"></div>
+  </div>
+
+  <div class="panel">
+    <h2><span class="hico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 7.2V12l3.4 2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>内置定时（每天批量签到全部账号） <span class="tag">服务器部署时的自足定时器</span></h2>
     <div class="row">
       <div class="field"><label>启用定时</label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -284,13 +291,13 @@
     </div>
     <div class="tbl-scroll">
       <table>
-        <thead><tr><th style="width:150px">时间</th><th style="width:110px">类型</th><th style="width:150px">结果</th><th>详情</th></tr></thead>
+        <thead><tr><th style="width:150px">时间</th><th style="width:150px">类型</th><th style="width:150px">结果</th><th>详情</th></tr></thead>
         <tbody id="logBody"><tr><td colspan="4" style="text-align:center;color:var(--muted)">加载中…</td></tr></tbody>
       </table>
     </div>
   </div>
 
-  <footer>点击右上角齿轮进入「设置」：账号与引擎全部配置（学号/密码/学校/坐标/代理等）一次保存 · 密码永不回显 · 默认仅监听本机，对外部署请设置 WEB_TOKEN</footer>
+  <footer>每个账号 = accounts/ 下的一对文件（xxx.yml 配置 + xxx.device_id 绑定），Web 与批量脚本共用同一数据源 · 密码永不回显 · 默认仅监听本机，对外部署请设置 WEB_TOKEN</footer>
 </div>
 
 <div class="mask" id="tokenMask">
@@ -304,36 +311,25 @@
   </div>
 </div>
 
-<div class="mask" id="settingsMask">
-  <div class="modal settings-modal">
-    <div class="sm-head">
-      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3.1"/><path d="M12 3.2v2.3M12 18.5v2.3M3.2 12h2.3M18.5 12h2.3M5.8 5.8l1.6 1.6M16.6 16.6l1.6 1.6M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6" stroke-linecap="round"/></svg>设置</h3>
-      <button class="ghost" onclick="closeSettings()" style="padding:6px 12px">关闭</button>
+<div class="mask" id="accountMask">
+  <div class="modal account-modal">
+    <div class="am-head">
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c1.5-3.6 4.4-5 8-5s6.5 1.4 8 5" stroke-linecap="round"/></svg><span id="amTitle">新增账号</span></h3>
+      <button class="ghost" onclick="closeAccountModal()" style="padding:6px 12px">关闭</button>
     </div>
-    <div class="sm-scroll">
-      <h4>账号</h4>
-      <div class="sm-group">
+    <div class="am-scroll">
+      <h4>基本</h4>
+      <div class="am-group">
         <div class="row">
-          <div class="field"><label>学号（用户名）</label><input type="text" id="psUser" autocomplete="username" placeholder="请输入学号"></div>
-          <div class="field"><label>密码</label><input type="password" id="psPass" autocomplete="new-password" placeholder="留空则保持原密码"></div>
-          <button class="ghost" onclick="testLogin()">测试登录</button>
-          <button class="ghost" onclick="clearCreds()">清除已保存账号</button>
-        </div>
-        <div class="row"><span class="pill def" id="loginTestState">未测试</span><span class="tag" id="credState"></span></div>
-        <div class="hint" id="credHint"></div>
-      </div>
-
-      <h4>基础信息</h4>
-      <div class="sm-group">
-        <div class="row">
+          <div class="field"><label>账号名（唯一，1~32 位，不能以 _ 开头）</label><input type="text" id="mName" placeholder="如 zhangsan" autocomplete="off"></div>
           <div class="field"><label>学校名称（输入关键字搜索，或直接输入）</label>
-            <div style="position:relative" id="psSchoolWrap">
-              <input type="text" id="psSchool" placeholder="如 XX大学" autocomplete="off">
+            <div style="position:relative" id="mSchoolWrap">
+              <input type="text" id="mSchool" placeholder="如 XX大学" autocomplete="off">
               <ul class="school-drop" id="schoolDrop"></ul>
             </div>
           </div>
           <div class="field"><label>任务类型</label>
-            <select id="psType">
+            <select id="mType">
               <option value="0">0 收集</option>
               <option value="1">1 签到</option>
               <option value="2">2 查寝</option>
@@ -341,46 +337,73 @@
               <option value="4">4 教师工作日志</option>
             </select>
           </div>
-          <div class="field"><label>HTTP 代理（可选）</label><input type="text" id="psProxy" placeholder="如 http://127.0.0.1:7890"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>学号（用户名）</label><input type="text" id="mUser" autocomplete="username" placeholder="编辑时留空则保持原账号"></div>
+          <div class="field"><label>密码</label><input type="password" id="mPass" autocomplete="new-password" placeholder="编辑时留空则保持原密码"></div>
+          <div class="field"><label>HTTP 代理（可选）</label><input type="text" id="mProxy" placeholder="如 http://127.0.0.1:7890"></div>
         </div>
       </div>
 
       <h4>签到定位</h4>
-      <div class="sm-group">
+      <div class="am-group">
         <div class="row">
-          <div class="field"><label>经度 lon（GCJ-02）</label><input type="number" step="any" id="psLon"></div>
-          <div class="field"><label>纬度 lat（GCJ-02）</label><input type="number" step="any" id="psLat"></div>
-          <div class="field"><label>定位地址文本</label><input type="text" id="psAddr" placeholder="签到点地址"></div>
-          <button class="primary" onclick="fetchSignRange()">从服务器获取签到范围</button>
+          <div class="field"><label>经度 lon（GCJ-02）</label><input type="number" step="any" id="mLon"></div>
+          <div class="field"><label>纬度 lat（GCJ-02）</label><input type="number" step="any" id="mLat"></div>
+          <div class="field"><label>定位地址文本</label><input type="text" id="mAddr" placeholder="签到点地址"></div>
+          <button class="primary" onclick="signRangeAcc()">从服务器获取签到范围</button>
         </div>
+        <div class="row"><span class="tag" id="mRangeState"></span></div>
       </div>
 
       <h4>高级选项</h4>
-      <div class="sm-group">
+      <div class="am-group">
         <div class="row">
-          <div class="field"><label>异常原因（无则留空）</label><input type="text" id="psAbn" placeholder="如 信号异常"></div>
+          <div class="field"><label>异常原因（无则留空）</label><input type="text" id="mAbn" placeholder="如 信号异常"></div>
           <div class="field"><label>签到照片（可选）</label>
             <div style="display:flex;gap:8px">
-              <input type="text" id="psPhoto" placeholder="选择或输入文件名，如 daka.jpg" style="flex:1">
-              <button class="ghost" type="button" onclick="el('psPhotoFile').click()">浏览…</button>
-              <input type="file" id="psPhotoFile" accept="image/*" style="display:none">
+              <input type="text" id="mPhoto" placeholder="选择或输入文件名，如 daka.jpg" style="flex:1">
+              <button class="ghost" type="button" onclick="el('mPhotoFile').click()">浏览…</button>
+              <input type="file" id="mPhotoFile" accept="image/*" style="display:none">
             </div>
           </div>
           <div class="field"><label>表单标题校验</label>
-            <select id="psTitle">
+            <select id="mTitle">
               <option value="0">0 不校验</option>
               <option value="1">1 校验</option>
             </select>
           </div>
+          <div class="field"><label>消息推送</label>
+            <select id="mNotifyMethod">
+              <option value="0">0 禁用</option>
+              <option value="2">2 Server酱/Webhook</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1 1 100%"><label>Server酱 SendKey（SCT开头）或完整推送地址</label><input type="text" id="mNotifyRcv" placeholder="如 SCTxxxx 或 https://sctapi.ftqq.com/SCTxxxx.send"></div>
         </div>
       </div>
 
-      <div class="hint" id="psHint"></div>
+      <h4>设备绑定（关键）</h4>
+      <div class="am-group">
+        <div class="row">
+          <div class="field"><label>deviceId</label><input type="text" id="mDev" placeholder="留空=沿用/首次运行自动生成；迁移请粘贴原 deviceId" autocomplete="off"></div>
+          <div class="field" style="flex:0 0 auto;justify-content:flex-end">
+            <div class="row">
+              <button class="ghost" onclick="testLoginAcc()">测试登录（不签到）</button>
+            </div>
+          </div>
+        </div>
+        <div class="row"><span class="pill def" id="mLoginState">未测试</span><span class="tag" id="mDevHint">deviceId 一旦与账号绑定，更换即可能触发“更换手机频繁”风控，请勿随意修改</span></div>
+      </div>
+
+      <div class="hint" id="amHint"></div>
     </div>
-    <div class="sm-foot">
-      <button class="primary" onclick="saveSettingsAll()">保存全部设置</button>
-      <button class="ghost" onclick="closeSettings()">取消</button>
-      <span class="hint"></span>
+    <div class="am-foot">
+      <button class="primary" onclick="saveAccount()">保存账号</button>
+      <button class="ghost" onclick="closeAccountModal()">取消</button>
+      <span class="hint" id="amFootHint"></span>
     </div>
   </div>
 </div>
@@ -389,7 +412,9 @@
 <script>
 const LS_KEY = "jrxy_web_token";
 let token = localStorage.getItem(LS_KEY) || "";
+let editingName = "";            // 当前编辑的账号名；"" 表示新增
 const el = id => document.getElementById(id);
+const TYPE_MAP = {0:"收集",1:"签到",2:"查寝",3:"政工",4:"日志"};
 
 function headers(){
   const h = {"Content-Type":"application/json"};
@@ -423,28 +448,289 @@ function toast(msg, kind="ok"){
   requestAnimationFrame(()=>t.classList.add("show"));
   setTimeout(()=>{t.classList.remove("show"); setTimeout(()=>t.remove(),300);}, 3200);
 }
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function truncate(s,n){n=n||120;return s.length>n?s.slice(0,n)+"…":s;}
+function coordText(a){
+  return (a.lon==null || a.lat==null) ? "-" : a.lon + ", " + a.lat;
+}
+
+/* ================= 状态 ================= */
 function renderStatus(s){
-  el("cSchool").textContent = s.school || "-";
-  el("cUser").textContent = s.username || "-";
-  el("cType").textContent = {0:"收集",1:"签到",2:"查寝",3:"政工签到",4:"教师日志"}[s.type] ?? ("type="+s.type);
-  el("cDev").textContent = s.device_id || "-";
-  el("cCoord").textContent = (s.lon==null?"-":s.lon.toFixed(6)) + ", " + (s.lat==null?"-":s.lat.toFixed(6));
+  el("cPlatform").textContent = s.platform + (s.engine_ready ? "" : "（引擎缺失）");
+  el("cCount").textContent = s.account_count;
   el("cSched").textContent = s.scheduler.enabled
     ? (s.scheduler.time + " 启用" + (s.scheduler.next ? " · 下次 " + s.scheduler.next : ""))
     : "已停用";
-  el("psLon").value = s.lon==null ? "" : s.lon;
-  el("psLat").value = s.lat==null ? "" : s.lat;
-  el("psAddr").value = s.address || "";
+  el("cTime").textContent = s.server_time;
   el("inAuto").checked = s.scheduler.enabled;
   el("inTime").value = s.scheduler.time;
   el("nextRun").textContent = s.scheduler.enabled && s.scheduler.next ? ("下次执行：" + s.scheduler.next) : "定时已停用";
-  const st = s.scheduler.enabled ? "定时运行中" : "定时已停用";
-  el("engineText").textContent = s.engine_ready ? (s.platform + " · " + st) : ("引擎环境缺失！请运行部署脚本");
+  const st = s.scheduler.enabled ? "定时批量运行中" : "定时已停用";
+  el("engineText").textContent = s.engine_ready ? (s.platform + " · " + st) : "引擎环境缺失！请先部署引擎 venv";
   el("engineDot").className = "dot " + (s.engine_ready ? "on" : "off");
-  el("platformBadge").title = "服务器时间 " + s.server_time;
+  el("platformBadge").title = "账号目录 " + s.accounts_dir + " · 服务器时间 " + s.server_time;
 }
-function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function truncate(s,n){n=n||120;return s.length>n?s.slice(0,n)+"…":s;}
+
+/* ================= 账号列表 ================= */
+async function loadAccounts(){
+  try{
+    const r = await api("/api/accounts");
+    renderAccounts(r.accounts);
+    el("batchNote").textContent = r.accounts.length ? ("共 " + r.accounts.length + " 个账号") : "当前没有账号，请先新增";
+    return r.accounts;
+  }catch(e){
+    if (e.message !== "unauthorized") toast("账号列表加载失败：" + e.message, "bad");
+    return [];
+  }
+}
+function renderAccounts(list){
+  const b = el("accountBody");
+  if (!list.length){ b.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted)">暂无账号，点击右上角「新增账号」创建</td></tr>'; return; }
+  b.innerHTML = list.map(a=>{
+    const dev = a.device_id && !a.device_id.includes("未设置") ? a.device_id : '<span style="color:var(--warn)">未设置</span>';
+    const passCls = a.password_set ? 'ok' : 'bad';
+    return `<tr>
+      <td><b>${esc(a.name)}</b>${a.password_set ? '' : '<br><span style="color:var(--warn);font-size:11px">未设密码</span>'}</td>
+      <td>${esc(a.school || "-")}</td>
+      <td class="mono">${esc(a.username || "-")}</td>
+      <td>${TYPE_MAP[a.type] ?? ("type=" + a.type)}</td>
+      <td class="mono">${coordText(a)}</td>
+      <td class="mono" title="${esc(a.device_id || '')}">${dev}</td>
+      <td>
+        <button class="ghost small" onclick="openAccountModal('${esc(a.name)}')">编辑</button>
+        <button class="ghost small" onclick="runAccount('${esc(a.name)}','dry')">探测</button>
+        <button class="primary small" onclick="runAccount('${esc(a.name)}','submit')">签到</button>
+        <button class="danger small" onclick="deleteAccount('${esc(a.name)}')">删除</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+/* ================= 账号弹窗（新增/编辑） ================= */
+async function openAccountModal(name){
+  editingName = name || "";
+  const fields = ["mName","mSchool","mType","mUser","mPass","mProxy","mLon","mLat","mAddr","mAbn","mPhoto","mTitle","mDev","mNotifyMethod","mNotifyRcv"];
+  fields.forEach(f => el(f).value = "");
+  el("mLoginState").className = "pill def"; el("mLoginState").textContent = "未测试";
+  el("mRangeState").textContent = ""; el("amHint").textContent = "";
+  if (editingName){
+    el("amTitle").textContent = "编辑账号 · " + editingName;
+    el("mName").value = editingName;
+    el("mName").disabled = true;
+    el("mName").title = "账号名创建后不可修改";
+    el("amFootHint").textContent = "密码留空 = 保持原密码；学号可直接修改";
+    try{
+      const d = await api("/api/accounts/" + encodeURIComponent(editingName));
+      el("mSchool").value = d.schoolName || "";
+      el("mType").value = String(d.type);
+      el("mProxy").value = d.httpProxy || "";
+      el("mLon").value = (d.lon == null) ? "" : d.lon;
+      el("mLat").value = (d.lat == null) ? "" : d.lat;
+      el("mAddr").value = d.address || "";
+      el("mAbn").value = d.abnormalReason || "";
+      el("mPhoto").value = d.photo || "";
+      el("mTitle").value = String(d.checkTitle || 0);
+      el("mDev").value = d.device_id || "";
+      el("mDev").placeholder = "留空 = 沿用当前 deviceId（勿改）";
+      el("mUser").value = d.username || "";
+      el("mPass").value = "";
+      el("mPass").placeholder = "密码不回显；输入新密码即修改，留空保持原密码";
+      el("mNotifyMethod").value = String(d.notify_method || 0);
+      el("mNotifyRcv").value = d.notify_rcv || "";
+      el("mRangeState").textContent = "已保存账号 " + (d.username || "-") + (d.password_set ? " · 密码已设置" : " · 密码未设置");
+    }catch(e){
+      if (e.message !== "unauthorized") toast("账号详情加载失败：" + e.message, "bad");
+    }
+  }else{
+    el("amTitle").textContent = "新增账号";
+    el("mName").disabled = false;
+    el("mName").title = "";
+    el("mType").value = "2";
+    el("mNotifyMethod").value = "0";
+    el("mNotifyRcv").value = "";
+    el("mDev").placeholder = "留空=首次运行自动生成（仅限未绑定新账号）；迁移请粘贴原 deviceId";
+    el("amFootHint").textContent = "新建必须填写：账号名 / 学校 / 学号 / 密码";  }
+  el("accountMask").classList.add("show");
+  if (!editingName) setTimeout(()=>el("mName").focus(), 60);
+}
+function closeAccountModal(){ el("accountMask").classList.remove("show"); }
+
+function collectAccount(){
+  const body = {
+    schoolName: el("mSchool").value.trim(),
+    type: el("mType").value,
+    username: el("mUser").value.trim(),
+    password: el("mPass").value,
+    httpProxy: el("mProxy").value.trim(),
+    lon: el("mLon").value,
+    lat: el("mLat").value,
+    address: el("mAddr").value.trim(),
+    abnormalReason: el("mAbn").value.trim(),
+    photo: el("mPhoto").value.trim(),
+    checkTitle: el("mTitle").value,
+    notifyMethod: el("mNotifyMethod").value,
+    notifyRcv: el("mNotifyRcv").value.trim(),
+    deviceId: el("mDev").value.trim()
+  };
+  if (!editingName) body.name = el("mName").value.trim();
+  return body;
+}
+async function saveAccount(){
+  const btn = document.querySelector('button[onclick="saveAccount()"]');
+  const oldTxt = btn.textContent;
+  btn.disabled = true; btn.textContent = "保存中…";
+  try{
+    const body = collectAccount();
+    if (editingName){
+      await api("/api/accounts/" + encodeURIComponent(editingName), {method:"POST", body:JSON.stringify(body)});
+      toast("账号已更新", "ok");
+    }else{
+      await api("/api/accounts", {method:"POST", body:JSON.stringify(body)});
+      toast("账号已创建", "ok");
+    }
+    closeAccountModal();
+    loadAccounts(); refreshStatus();
+  }catch(e){ toast("保存失败：" + e.message, "bad"); }
+  finally{ btn.disabled = false; btn.textContent = oldTxt; }
+}
+async function deleteAccount(name){
+  if (!confirm("确定删除账号「" + name + "」？\n\n只会删除其 yml 配置；deviceId 文件会保留，重新接入可沿用原绑定。")) return;
+  try{
+    await api("/api/accounts/" + encodeURIComponent(name), {method:"DELETE"});
+    toast("账号已删除", "ok");
+    loadAccounts(); refreshStatus();
+  }catch(e){ toast("删除失败：" + e.message, "bad"); }
+}
+
+/* ================= 单账号运行 / 批量运行 ================= */
+function showResult(boxId, r){
+  const box = el(boxId);
+  const cls = r.result.includes("成功") ? "ok" : (r.result.includes("未开始") || r.result.includes("重复") ? "warn" : (r.result.includes("失败")||r.result.includes("异常") ? "bad" : "def"));
+  box.className = "result show " + cls;
+  box.textContent = "【" + r.result + "】\n\n" + r.detail;
+}
+async function runAccount(name, mode){
+  const label = (mode === "submit" ? "签到" : "探测") + " " + name;
+  const box = el("resultBoxAcc");
+  box.className = "result show";
+  box.textContent = "正在执行「" + label + "」（登录→查任务→" + (mode==="submit"?"提交":"构造提交体") + "），约需 5~30 秒…";
+  try{
+    const r = await api("/api/accounts/" + encodeURIComponent(name) + "/run", {method:"POST", body:JSON.stringify({mode})});
+    showResult("resultBoxAcc", r);
+    toast(label + "：" + r.result, r.result.includes("失败")||r.result.includes("异常") ? "bad" : "ok");
+    loadLogs();
+  }catch(e){
+    if (e.message !== "unauthorized"){
+      box.className = "result show bad";
+      box.textContent = "执行失败：" + e.message;
+      toast(label + "失败：" + e.message, "bad");
+    }
+  }
+}
+async function batchRun(mode){
+  const btn = mode === "submit" ? el("btnBatchSubmit") : el("btnBatchDry");
+  btn.disabled = true;
+  const old = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span>执行中…';
+  const box = el("resultBoxBatch");
+  box.className = "result show";
+  box.textContent = "正在批量" + (mode==="submit"?"签到":"探测") + "全部账号，按账号顺序依次执行（每个约 5~30 秒）…";
+  try{
+    const r = await api("/api/batch-run", {method:"POST", body:JSON.stringify({mode})});
+    showResult("resultBoxBatch", r);
+    toast("批量" + (mode==="submit"?"签到":"探测") + "：" + r.result, r.result.includes("失败")||r.result.includes("异常") ? "bad" : "ok");
+    loadLogs(); loadAccounts();
+  }catch(e){
+    if (e.message !== "unauthorized"){
+      box.className = "result show bad";
+      box.textContent = "执行失败：" + e.message;
+      toast("批量执行失败：" + e.message, "bad");
+    }
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+}
+
+/* ================= 弹窗内：测试登录 / 获取范围 / 上传照片 ================= */
+async function testLoginAcc(){
+  if (!editingName){ toast("请先保存账号后再测试登录", "bad"); return; }
+  const btn = document.querySelector('button[onclick="testLoginAcc()"]');
+  const oldTxt = btn.textContent;
+  const st = el("mLoginState");
+  btn.disabled = true; btn.textContent = "测试中…";
+  st.className = "pill def"; st.textContent = "正在执行登录测试（CAS 登录，不签到）…";
+  try{
+    const r = await api("/api/accounts/" + encodeURIComponent(editingName) + "/test-login", {method:"POST", body:"{}"});
+    if (r.ok){
+      st.className = "pill ok";
+      st.textContent = "登录成功" + (r.host ? " · " + r.host.replace(/^https?:\/\//,"").replace(/\/+$/,"") : "");
+      toast("登录成功（仅测试，未签到）", "ok");
+    }else{
+      st.className = "pill bad";
+      st.textContent = "登录失败：" + String(r.error || "").slice(0, 60);
+      toast("登录失败：" + String(r.error || "").slice(0, 80), "bad");
+    }
+  }catch(e){
+    st.className = "pill bad";
+    st.textContent = "测试异常：" + e.message.slice(0, 60);
+    toast("测试异常：" + e.message, "bad");
+  }finally{
+    btn.disabled = false; btn.textContent = oldTxt;
+  }
+}
+async function signRangeAcc(){
+  if (!editingName){ toast("请先保存账号后再获取签到范围", "bad"); return; }
+  const btn = document.querySelector('button[onclick="signRangeAcc()"]');
+  const oldTxt = btn.textContent;
+  if (btn){ btn.disabled = true; btn.textContent = "获取中…"; }
+  try{
+    const r = await api("/api/accounts/" + encodeURIComponent(editingName) + "/sign-range", {method:"POST", body:"{}"});
+    const rg = r.range;
+    el("mLon").value = rg.lon;
+    el("mLat").value = rg.lat;
+    el("mAddr").value = rg.address || "";
+    const win = (rg.window_begin && rg.window_end) ? (" · 窗口 " + rg.window_begin + " ~ " + rg.window_end) : "";
+    el("mRangeState").textContent = "✅ 已获取：中心(" + Number(rg.lon).toFixed(6) + ", " + Number(rg.lat).toFixed(6) + ") 半径 " + rg.radius + "m" + win;
+    toast("签到范围已获取并写入该账号", "ok");
+  }catch(e){ toast("获取失败：" + e.message, "bad"); }
+  finally{ if (btn){ btn.disabled = false; btn.textContent = oldTxt; } }
+}
+async function uploadPhotoAcc(ev){
+  const fi = ev.target;
+  const f = fi.files && fi.files[0];
+  if (!f) return;
+  if (!editingName){ toast("请先保存账号后再上传照片", "bad"); fi.value = ""; return; }
+  if (f.size > 5 * 1024 * 1024){ toast("图片不能超过 5MB", "bad"); fi.value = ""; return; }
+  const ext = (f.name.split(".").pop() || "").toLowerCase();
+  if (!["jpg","jpeg","png","webp","gif"].includes(ext)){ toast("仅支持 jpg/png/webp/gif 图片", "bad"); fi.value = ""; return; }
+  toast("正在上传 " + f.name + " …", "ok");
+  try{
+    const data = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = () => rej(new Error("读取文件失败"));
+      r.readAsDataURL(f);
+    });
+    const r = await api("/api/accounts/" + encodeURIComponent(editingName) + "/photo", {method:"POST", body:JSON.stringify({name: f.name, data})});
+    el("mPhoto").value = r.photo;
+    toast("照片已上传：" + r.photo + "（" + Math.max(1, Math.round(r.size / 1024)) + " KB）", "ok");
+  }catch(e){ toast("上传失败：" + e.message, "bad"); }
+  finally{ fi.value = ""; }
+}
+
+/* ================= 定时 ================= */
+async function saveSchedule(){
+  try{
+    await api("/api/schedule", {method:"POST", body:JSON.stringify({
+      enabled: el("inAuto").checked, time: el("inTime").value
+    })});
+    toast("定时设置已保存", "ok");
+    refreshStatus();
+  }catch(e){ toast("保存失败：" + e.message, "bad"); }
+}
+
+/* ================= 日志 ================= */
 function toggleLogDetail(row){
   const d = row.nextElementSibling;
   if (d && d.classList.contains("log-detail")){
@@ -466,143 +752,22 @@ function renderLogs(logs){
     <tr class="log-detail" style="display:none"><td colspan="4"><pre>${safe}</pre></td></tr>`;
   }).join("");
 }
-async function refreshAll(){
+async function loadLogs(){
   try{
-    const s = await api("/api/status");
-    renderStatus(s);
     const lg = await api("/api/logs?limit=50");
     renderLogs(lg.logs);
-  }catch(e){
-    if (e.message !== "unauthorized") toast("状态加载失败：" + e.message, "bad");
-  }
-}
-async function run(mode){
-  const btn = mode==="submit" ? el("btnSubmit") : el("btnDry");
-  btn.disabled = true;
-  const old = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner"></span>执行中…';
-  el("resultBox").className = "result show";
-  el("resultBox").textContent = "正在执行（登录→查任务→" + (mode==="submit"?"提交":"构造提交体") + "），约需 5~20 秒…";
-  try{
-    const r = await api("/api/run", {method:"POST", body:JSON.stringify({mode})});
-    const cls = r.result.includes("成功") ? "ok" : (r.result.includes("未开始") || r.result.includes("重复") ? "warn" : "bad");
-    el("resultBox").className = "result show " + cls;
-    el("resultBox").textContent = "【" + r.result + "】\n\n" + r.detail;
-    toast(r.result, cls==="ok"?"ok":"warn");
-    const lg = await api("/api/logs?limit=50");
-    renderLogs(lg.logs);
-  }catch(e){
-    if (e.message !== "unauthorized"){
-      el("resultBox").className = "result show bad";
-      el("resultBox").textContent = "执行失败：" + e.message;
-      toast("执行失败：" + e.message, "bad");
-    }
-  }finally{
-    btn.disabled = false;
-    btn.innerHTML = old;
-  }
-}
-async function saveSchedule(){
-  try{
-    await api("/api/schedule", {method:"POST", body:JSON.stringify({
-      enabled: el("inAuto").checked, time: el("inTime").value
-    })});
-    toast("定时设置已保存", "ok");
-    refreshAll();
-  }catch(e){ toast("保存失败：" + e.message, "bad"); }
-}
-
-/* ================= 设置弹窗（账号 + config.yml 全字段） ================= */
-async function loadSettings(){
-  try{
-    const s = await api("/api/settings");
-    el("psSchool").value = "";
-    el("psType").value = String(s.type);
-    el("psProxy").value = s.httpProxy || "";
-    el("psLon").value = (s.lon == null) ? "" : s.lon;
-    el("psLat").value = (s.lat == null) ? "" : s.lat;
-    el("psAddr").value = s.address || "";
-    el("psAbn").value = s.abnormalReason || "";
-    el("psPhoto").value = s.photo || "";
-    el("psTitle").value = String(s.checkTitle || 0);
-    el("psUser").value = "";
-    el("psPass").value = "";
-    el("psHint").textContent = "已读取 config.yml 当前值；学号/密码/学校名称留空表示不改动，密码不在此界面回显。";
-  }catch(e){ if (e.message !== "unauthorized") toast("设置加载失败：" + e.message, "bad"); }
-}
-async function saveSettingsAll(){
-  const btn = document.querySelector('button[onclick="saveSettingsAll()"]');
-  const oldTxt = btn.textContent;
-  btn.disabled = true; btn.textContent = "保存中…";
-  try{
-    await api("/api/settings", {method:"POST", body:JSON.stringify({
-      schoolName: el("psSchool").value,
-      type: el("psType").value,
-      httpProxy: el("psProxy").value,
-      lon: el("psLon").value,
-      lat: el("psLat").value,
-      address: el("psAddr").value,
-      abnormalReason: el("psAbn").value,
-      photo: el("psPhoto").value,
-      checkTitle: el("psTitle").value,
-      username: el("psUser").value,
-      password: el("psPass").value
-    })});
-    toast("全部设置已保存并生效", "ok");
-    loadSettings(); refreshAll(); loadCreds();
-  }catch(e){ toast("保存失败：" + e.message, "bad"); }
-  finally{ btn.disabled = false; btn.textContent = oldTxt; }
-}
-function openSettings(){
-  loadSettings(); loadCreds();
-  el("settingsMask").classList.add("show");
-}
-function closeSettings(){
-  el("settingsMask").classList.remove("show");
-}
-
-/* ================= 账号状态（Web 保存学号/密码） ================= */
-async function loadCreds(){
-  try{
-    const c = await api("/api/credentials");
-    el("psUser").value = "";   // 不预填（显示的是脱敏账号），避免误保存覆盖
-    el("psPass").value = "";
-    el("credState").textContent =
-      (c.source === "web" ? ("已保存账号 " + (c.username || "-") + "（Web 生效中）")
-                          : "未在 Web 保存（使用 config.yml）") +
-      (c.password_set ? " · 密码已设置" : "");
-    el("credHint").textContent = c.note || "";
-  }catch(e){ if (e.message !== "unauthorized") toast("账号状态加载失败：" + e.message, "bad"); }
-}
-async function uploadPhoto(ev){
-  const fi = ev.target;
-  const f = fi.files && fi.files[0];
-  if (!f) return;
-  if (f.size > 5 * 1024 * 1024){ toast("图片不能超过 5MB", "bad"); fi.value = ""; return; }
-  const ext = (f.name.split(".").pop() || "").toLowerCase();
-  if (!["jpg","jpeg","png","webp","gif"].includes(ext)){ toast("仅支持 jpg/png/webp/gif 图片", "bad"); fi.value = ""; return; }
-  toast("正在上传 " + f.name + " …", "ok");
-  try{
-    const data = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result);
-      r.onerror = () => rej(new Error("读取文件失败"));
-      r.readAsDataURL(f);
-    });
-    const r = await api("/api/photo", {method:"POST", body:JSON.stringify({name: f.name, data})});
-    el("psPhoto").value = r.photo;
-    toast("照片已上传：" + r.photo + "（" + Math.max(1, Math.round(r.size / 1024)) + " KB）", "ok");
-  }catch(e){ toast("上传失败：" + e.message, "bad"); }
-  finally{ fi.value = ""; }
+  }catch(e){}
 }
 async function clearLogs(){
   if (!confirm("确定清空全部运行日志？此操作不可恢复。")) return;
   try{
     await api("/api/logs/clear", {method:"POST", body:"{}"});
     toast("运行日志已清空", "ok");
-    refreshAll();
+    loadLogs();
   }catch(e){ toast("清除失败：" + e.message, "bad"); }
 }
+
+/* ================= 学校下拉搜索 ================= */
 function hideSchoolDrop(){ const ul = el("schoolDrop"); if (ul) ul.style.display = "none"; }
 function renderSchoolDrop(q){
   const ul = el("schoolDrop");
@@ -616,76 +781,28 @@ function renderSchoolDrop(q){
   ul.innerHTML = hits.map(s => '<li data-s="' + s + '">' + s + "</li>").join("");
   ul.style.display = "block";
   ul.querySelectorAll("li[data-s]").forEach(li => {
-    li.addEventListener("click", () => { el("psSchool").value = li.dataset.s; hideSchoolDrop(); });
+    li.addEventListener("click", () => { el("mSchool").value = li.dataset.s; hideSchoolDrop(); });
   });
 }
 let schoolTimer = null;
-el("psSchool").addEventListener("input", () => {
+el("mSchool").addEventListener("input", () => {
   clearTimeout(schoolTimer);
-  schoolTimer = setTimeout(() => renderSchoolDrop(el("psSchool").value.trim()), 150);
+  schoolTimer = setTimeout(() => renderSchoolDrop(el("mSchool").value.trim()), 150);
 });
-el("psSchool").addEventListener("focus", () => renderSchoolDrop(el("psSchool").value.trim()));
-el("psSchool").addEventListener("keydown", e => { if (e.key === "Escape") hideSchoolDrop(); });
-document.addEventListener("click", e => { if (!e.target.closest("#psSchoolWrap")) hideSchoolDrop(); });
-async function testLogin(){
-  const btn = document.querySelector('button[onclick="testLogin()"]');
-  const oldTxt = btn.textContent;
-  const st = el("loginTestState");
-  btn.disabled = true; btn.textContent = "测试中…";
-  st.className = "pill def"; st.textContent = "正在执行登录测试（CAS 登录，不签到）…";
-  try{
-    const r = await api("/api/test-login", {method:"POST", body:"{}"});
-    if (r.ok){
-      st.className = "pill ok";
-      st.textContent = "登录成功" + (r.host ? " · " + r.host.replace(/^https?:\/\//,"").replace(/\/+$/,"") : "");
-      toast("登录成功（仅测试，未签到）", "ok");
-    }else{
-      st.className = "pill bad";
-      st.textContent = "登录失败：" + String(r.error || "").slice(0, 60);
-      toast("登录失败：" + String(r.error || "").slice(0, 80), "bad");
-    }
-  }catch(e){
-    st.className = "pill bad";
-    st.textContent = "测试异常：" + e.message.slice(0, 60);
-    toast("测试异常：" + e.message, "bad");
-  }finally{
-    btn.disabled = false; btn.textContent = oldTxt;
-  }
-}
-async function clearCreds(){
-  if (!confirm("确定清除 Web 保存的学号/密码？清除后将回退使用 config.yml 中的账号。")) return;
-  try{
-    await api("/api/credentials", {method:"POST", body:JSON.stringify({username:"", password:""})});
-    toast("已清除，回退 config.yml", "ok");
-    refreshAll(); loadCreds();
-  }catch(e){ toast("清除失败：" + e.message, "bad"); }
-}
+el("mSchool").addEventListener("focus", () => renderSchoolDrop(el("mSchool").value.trim()));
+el("mSchool").addEventListener("keydown", e => { if (e.key === "Escape") hideSchoolDrop(); });
+document.addEventListener("click", e => { if (!e.target.closest("#mSchoolWrap")) hideSchoolDrop(); });
 
-/* ================= 从服务器获取签到范围 =================
-   调用后端 /api/sign-range：引擎登录 → 查任务详情 → 取 signPlaceSelected
-   （中心点 + 半径），自动填入并写入 data/override.json，作为签到地址立即生效。 */
-async function fetchSignRange(){
-  const btn = document.querySelector('button[onclick="fetchSignRange()"]');
-  const oldTxt = btn ? btn.textContent : "";
-  if (btn){ btn.disabled = true; btn.textContent = "获取中…"; }
-  try{
-    const r = await api("/api/sign-range", {method:"POST", body:"{}"});
-    const rg = r.range;
-    el("psLon").value = rg.lon;
-    el("psLat").value = rg.lat;
-    el("psAddr").value = rg.address || "";
-    loadSettings();
-    const win = (rg.window_begin && rg.window_end)
-      ? (" · 窗口 " + rg.window_begin + " ~ " + rg.window_end) : "";
-    toast("✅ 已获取签到范围：中心(" + Number(rg.lon).toFixed(6) + ", " + Number(rg.lat).toFixed(6)
-      + ") 半径 " + rg.radius + "m" + win, "ok");
-    refreshAll();
-  }catch(e){ toast("获取失败：" + e.message, "bad"); }
-  finally{
-    if (btn){ btn.disabled = false; btn.textContent = oldTxt; }
-  }
-}
 /* ================= 启动 ================= */
+async function refreshStatus(){
+  try{ renderStatus(await api("/api/status")); }
+  catch(e){ if (e.message !== "unauthorized") toast("状态加载失败：" + e.message, "bad"); }
+}
+async function refreshAll(){
+  await refreshStatus();
+  await loadAccounts();
+  await loadLogs();
+}
 function startClock(){
   const tick = () => {
     const d = new Date();
@@ -699,13 +816,11 @@ function startClock(){
 }
 startClock();
 refreshAll();
-loadCreds();
-loadSettings();
-document.addEventListener("keydown", e=>{ if (e.key === "Escape") closeSettings(); });
-el("settingsMask").addEventListener("click", e=>{ if (e.target === el("settingsMask")) closeSettings(); });
-el("psPhotoFile").addEventListener("change", uploadPhoto);
+document.addEventListener("keydown", e=>{ if (e.key === "Escape") closeAccountModal(); });
+el("accountMask").addEventListener("click", e=>{ if (e.target === el("accountMask")) closeAccountModal(); });
+el("mPhotoFile").addEventListener("change", uploadPhotoAcc);
 setInterval(()=>{ api("/api/status").then(renderStatus).catch(()=>{}); }, 60000);
-setInterval(()=>{ api("/api/logs?limit=50").then(lg=>renderLogs(lg.logs)).catch(()=>{}); }, 30000);
+setInterval(()=>{ loadLogs(); }, 30000);
 </script>
 </body>
 </html>

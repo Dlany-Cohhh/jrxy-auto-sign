@@ -1,38 +1,44 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-今日校园自动签到 · Web 服务
-============================
-将 jrxy-engine 签到引擎封装为可部署在 Windows / Linux 服务器上的 Web 服务，
-提供管理界面（状态概览 / 手动签到 / 坐标与定时设置 / 运行日志）。
+今日校园自动签到 · Web 服务（多账号版）
+=====================================
+将 jrxy-engine 签到引擎封装为多账号 Web 管理服务。
 
-启动方式（二选一，见 README-部署手册.md）：
+账号数据源（与 scripts/batch_submit.py 共用，见 accounts/README.md）：
+  accounts/<name>.yml         每账号配置（users 列表只含该账号）
+  accounts/<name>.device_id   每账号固定 deviceId（首次运行自动生成；迁移时手工写入原 ID）
+
+启动方式：
   Windows: web-server\\.venv\\Scripts\\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
   Linux  : web-server/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000
-  Docker : docker compose up -d --build
 
 环境变量：
-  HOST       监听地址，默认 127.0.0.1（服务器对外部署可设 0.0.0.0）
-  PORT       监听端口，默认 8000
-  WEB_TOKEN  可选；设置后所有接口需携带请求头 X-Web-Token
-  SIGN_TIME  内置定时签到时间（24 小时制 HH:MM），默认 22:05
-  AUTO_SIGN  内置定时开关，默认 1=启用 0=停用
+  HOST                监听地址，默认 127.0.0.1（对外部署可设 0.0.0.0）
+  PORT                监听端口，默认 8000
+  WEB_TOKEN           可选；设置后所有接口需携带请求头 X-Web-Token
+  SIGN_TIME           内置定时签到时间（24 小时制 HH:MM），默认 22:05
+  AUTO_SIGN           内置定时开关，默认 1=启用 0=停用
+  JRXY_ACCOUNTS_DIR   账号配置目录，默认 <项目根>/accounts
 
 安全提示：
   - 默认仅监听本机；对外部署务必设置 WEB_TOKEN 并启用 HTTPS/反向代理。
-  - 学号/密码可在 Web 页面保存，写入 data/credentials.json（不入 git、绝不返回密码）；
-    运行签到/探测时以环境变量传入引擎（优先于 config.yml）。config.yml 作为未在
-    Web 保存时的兜底（豆包定时任务直连引擎时仍用 config.yml）。
-  - 坐标/地址修改优先写入 data/override.json（命令行参数覆盖），不改动 config.yml 注释结构。
+  - accounts/*.yml 与 *.device_id 已被 .gitignore 排除，密码绝不回传。
+  - 每账号 deviceId 独立固定；已有绑定账号迁移时请在页面填写原 deviceId，
+    切勿让其重新生成，否则触发“更换手机频繁”风控。
 """
 import base64
 import json
 import logging
 import os
+import re
 import sqlite3
 import subprocess
 import threading
 import time
+import uuid
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -47,10 +53,11 @@ ENGINE_DIR = ROOT / "jrxy-engine"                    # 签到引擎目录
 WEB_DIR = Path(__file__).resolve().parent
 DATA_DIR = WEB_DIR / "data"
 STATIC_DIR = WEB_DIR / "static"
+ACCOUNTS_DIR = Path(os.getenv("JRXY_ACCOUNTS_DIR", str(ROOT / "accounts")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+ACCOUNTS_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "signlog.db"
-OVERRIDE_PATH = DATA_DIR / "override.json"
-CREDS_PATH = DATA_DIR / "credentials.json"
+SCHED_PATH = DATA_DIR / "schedule.json"
 INDEX_HTML = STATIC_DIR / "index.html"
 
 IS_WIN = os.name == "nt"
@@ -58,6 +65,7 @@ ENGINE_PY = ENGINE_DIR / (".venv/Scripts/python.exe" if IS_WIN else ".venv/bin/p
 SUBMIT_SCRIPT = ENGINE_DIR / "scripts" / "merged_ios_v4_submit.py"
 RANGE_SCRIPT = ENGINE_DIR / "scripts" / "fetch_sign_range.py"
 TESTLOGIN_SCRIPT = ENGINE_DIR / "scripts" / "test_login.py"
+BATCH_SCRIPT = ENGINE_DIR / "scripts" / "batch_submit.py"
 
 # ---------------- 运行配置（环境变量） ----------------
 HOST = os.getenv("HOST", "127.0.0.1")
@@ -89,7 +97,7 @@ def save_log(kind: str, result: str, detail: str):
                 "INSERT INTO sign_log(ts, kind, result, detail) VALUES(?,?,?,?)",
                 (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), kind, result, detail[-4000:]),
             )
-    except Exception as e:  # 日志失败不影响主流程
+    except Exception as e:
         log.warning("save_log failed: %s", e)
 
 def fetch_logs(limit: int = 50):
@@ -107,145 +115,124 @@ def clear_logs():
     with sqlite3.connect(DB_PATH) as c:
         c.execute("DELETE FROM sign_log")
 
-# ---------------- 配置读写 ----------------
-# 默认占位 config.yml（零真实信息）：首次启动自动生成，真实信息在 Web 设置中填写后写回。
-# 该文件已在 .gitignore 中，永不入库。
-DEFAULT_ENGINE_CONFIG = """notifyOption:
-    method: 0
-    mailApiUrl: ''
-ocrOption:
-    SecretId: ''
-    SecretKey: ''
-httpProxy: ''
-users:
-    - user:
-        type: 2
-        schoolName: ''
-        username: ''
-        password: ''
-        address: ''
-        lon: 0.0
-        lat: 0.0
-        abnormalReason: ''
-        photo: ''
-        checkTitle: 0
-"""
+# ---------------- 账号（accounts/ 目录，与 batch_submit.py 共用） ----------------
+NAME_RE = re.compile(r"^[A-Za-z0-9_\-\.\u4e00-\u9fa5]{1,32}$")
 
-def ensure_engine_config():
-    """config.yml 不存在时自动生成占位版（解决全新部署无配置导致 500）。"""
-    p = ENGINE_DIR / "config.yml"
-    if not p.exists():
-        p.write_text(DEFAULT_ENGINE_CONFIG, encoding="utf-8")
-        print(f"[init] 已自动生成 {p}（占位配置，请在 Web 管理台「设置」填写真实信息）")
-    return p
+def valid_account_name(name: str) -> bool:
+    return bool(name) and not name.startswith("_") and NAME_RE.match(name) \
+        and name not in (".", "..")
 
-def load_engine_config():
-    """读取引擎 config.yml（只读；不存在则自动生成占位版）。"""
-    with open(ensure_engine_config(), encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def account_paths(name: str):
+    return ACCOUNTS_DIR / (name + ".yml"), ACCOUNTS_DIR / (name + ".device_id")
 
-def user_config():
-    cfg = load_engine_config()
-    return cfg["users"][0]["user"]
+def list_accounts() -> list:
+    if not ACCOUNTS_DIR.is_dir():
+        return []
+    out = []
+    for f in sorted(os.listdir(ACCOUNTS_DIR)):
+        if f.endswith(".yml") and not f.startswith("_"):
+            out.append(f[:-4])
+    return out
 
-def load_override() -> dict:
-    if OVERRIDE_PATH.exists():
+def read_did(did_file: Path) -> str:
+    """读取 deviceId（兼容 BOM）；文件不存在或为空返回 ''。"""
+    if did_file.exists():
         try:
-            return json.loads(OVERRIDE_PATH.read_text(encoding="utf-8"))
+            return did_file.read_text(encoding="utf-8-sig").strip()
         except Exception:
-            return {}
-    return {}
-
-def save_override(d: dict):
-    OVERRIDE_PATH.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
-
-# ---------------- Web 保存的账号密码（data/credentials.json，不入 git） ----------------
-def load_creds() -> dict:
-    if CREDS_PATH.exists():
-        try:
-            return json.loads(CREDS_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-def save_creds(username: str, password: str):
-    """username/password 同时为空 = 清除 Web 保存的账号。"""
-    d = {}
-    if username or password:
-        d = {"username": username.strip(), "password": password}
-    CREDS_PATH.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
-
-def creds_env() -> dict:
-    """引擎运行时注入的账号环境变量；账号密码必须同时存在才生效。"""
-    cr = load_creds()
-    if cr.get("username") and cr.get("password"):
-        return {"JRXY_USERNAME": cr["username"], "JRXY_PASSWORD": cr["password"]}
-    return {}
-
-def read_device_id() -> str:
-    for name in (".device_id", "device_id.txt"):
-        p = ENGINE_DIR / name
-        if p.exists():
-            return p.read_text(encoding="utf-8").strip()
+            return ""
     return ""
 
-def effective_info():
-    """有效配置 = Web 保存的账号优先，否则 config.yml；坐标 = override 优先。"""
-    ov = load_override()
-    u = user_config()
-    cr = load_creds()
-    return {
-        "school": u.get("schoolName", ""),
-        "username": cr.get("username") or u.get("username", ""),
-        "type": u.get("type", 2),
-        "lon": ov.get("lon", u.get("lon")),
-        "lat": ov.get("lat", u.get("lat")),
-        "address": ov.get("address", u.get("address", "")),
+def ensure_device_id(name: str) -> str:
+    """与 batch_submit.py 同规则：已存在且非空则沿用，否则生成一次（小写 UUID）。"""
+    _, did_file = account_paths(name)
+    val = read_did(did_file)
+    if val:
+        return val
+    if did_file.exists():
+        raise HTTPException(status_code=400, detail=f"{name}.device_id 内容为空！"
+                            "请填入该账号已绑定的 deviceId，或删除该文件让其自动生成（仅限无绑定新账号）")
+    did = str(uuid.uuid4())
+    did_file.write_text(did, encoding="utf-8")
+    return did
+
+def read_account(name: str):
+    """返回 (user dict, device_id str)；不存在则 404。"""
+    yml, _ = account_paths(name)
+    if not valid_account_name(name) or not yml.exists():
+        raise HTTPException(status_code=404, detail=f"账号 {name} 不存在")
+    try:
+        cfg = yaml.safe_load(yml.read_text(encoding="utf-8"))
+        user = cfg["users"][0]["user"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"账号 {name} 配置解析失败: {e}")
+    _, did_file = account_paths(name)
+    return user, read_did(did_file)
+
+def dump_account(user: dict, http_proxy: str = "") -> str:
+    # 引擎读取的是 user["httpProxy"]（user 级）；顶层 httpProxy 仅为兼容模板样式保留
+    user = dict(user)
+    user["httpProxy"] = http_proxy or ""
+    cfg = {
+        "notifyOption": {"method": 0, "mailApiUrl": ""},
+        "ocrOption": {"SecretId": "", "SecretKey": ""},
+        "httpProxy": http_proxy or "",
+        "users": [{"user": user}],
     }
+    return yaml.dump(cfg, allow_unicode=True, sort_keys=False, default_flow_style=False)
+
+def write_account(name: str, user: dict, http_proxy: str = ""):
+    yml, _ = account_paths(name)
+    yml.write_text(dump_account(user, http_proxy), encoding="utf-8")
 
 def mask_username(name: str) -> str:
-    """账号脱敏：只保留前四位，其余掩码。"""
     if not name:
         return ""
     if len(name) <= 4:
         return name[0] + "***"
     return name[:4] + "***"
 
-# ---------------- 引擎执行 ----------------
-def run_engine(dry: bool) -> str:
-    if not ENGINE_PY.exists():
-        return "引擎虚拟环境不存在: %s\n请先执行 deploy/install_windows.bat 或 deploy/install_linux.sh" % ENGINE_PY
-    e = effective_info()
-    args = []
-    if not dry:
-        args.append("--submit")
-    args += ["--variant", "fkey_cat", "--protocol", "ios"]
-    dev = read_device_id()
-    if dev:
-        args += ["--device-id", dev]
-    if e["lon"] is not None:
-        args += ["--lon", str(e["lon"])]
-    if e["lat"] is not None:
-        args += ["--lat", str(e["lat"])]
-    if e["address"]:
-        args += ["--address", e["address"]]
-    cmd = [str(ENGINE_PY), "-W", "ignore", str(SUBMIT_SCRIPT)] + args
-    env = dict(os.environ)
-    env.update(creds_env())   # Web 保存的账号密码（有则优先，无则回退 config.yml）
-    log.info("engine cmd: %s", " ".join(str(x) for x in cmd))
+def normalize_optional_num(v, default=None):
+    """数字字段：空串/None → default；否则 float。"""
+    if v is None or str(v).strip() == "":
+        return default
     try:
-        r = subprocess.run(
-            cmd, cwd=str(ENGINE_DIR), capture_output=True, text=True,
-            timeout=180, encoding="utf-8", errors="replace", env=env,
-        )
-        out = (r.stdout or "").strip()
-        if r.stderr and r.stderr.strip():
-            out += "\n[stderr]\n" + r.stderr.strip()
-        return out or "(无输出)"
+        return float(v)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="经度/纬度必须是数字")
+
+def account_summary(name: str) -> dict:
+    user, dev = read_account(name)
+    return {
+        "name": name,
+        "school": user.get("schoolName", ""),
+        "username": user.get("username", ""),
+        "type": user.get("type", 2),
+        "lon": user.get("lon"),
+        "lat": user.get("lat"),
+        "address": user.get("address", ""),
+        "photo": user.get("photo", ""),
+        "password_set": bool(user.get("password")),
+        "device_id": dev or "（未设置，首次运行自动生成）",
+    }
+
+# ---------------- 引擎执行 ----------------
+def run_cmd(cmd: list, timeout: int = 180, extra_env: Optional[dict] = None) -> str:
+    env = dict(os.environ)
+    env["JRXY_ACCOUNTS_DIR"] = str(ACCOUNTS_DIR)
+    if extra_env:
+        env.update(extra_env)
+    try:
+        r = subprocess.run(cmd, cwd=str(ENGINE_DIR), capture_output=True, text=True,
+                           timeout=timeout, encoding="utf-8", errors="replace", env=env)
     except subprocess.TimeoutExpired:
-        return "执行超时（180 秒），引擎可能卡在登录/网络请求上。"
+        return "执行超时（%ss），引擎可能卡在登录/网络请求上。" % timeout
     except Exception as e:
         return "执行异常: %s" % e
+    out = (r.stdout or "").strip()
+    if r.stderr and r.stderr.strip():
+        out += "\n[stderr]\n" + r.stderr.strip()
+    return out or "(无输出)"
 
 def classify(out: str) -> str:
     s = out
@@ -257,13 +244,113 @@ def classify(out: str) -> str:
         return "签到失败"
     if "已签到" in s or "重复提交" in s:
         return "已签到（重复提交）"
-    if "登录失败" in s or "Traceback" in s or "Exception" in s:
+    if "登录失败" in s or "Traceback" in s or "Exception" in s or "执行超时" in s:
         return "执行异常"
     return "执行完成（见详情）"
 
-# ---------------- 内置定时（线程版，零第三方依赖） ----------------
-scheduler_state = {"enabled": DEFAULT_AUTO_SIGN, "time": DEFAULT_SIGN_TIME, "next": None}
-_sched_wake = threading.Event()   # 设置变更时唤醒调度线程，立即重算下次执行
+def notify_head(result: str, kind: str = "签到") -> str:
+    """把结果归类为状态词：签到/探测 成功、失败、查寝未开始、无任务待签。"""
+    r = (result or "").strip()
+    if "查寝未开始" in r:
+        return "查寝未开始"
+    if "没有未签到的任务" in r:
+        return "无任务待签"
+    if any(k in r for k in ("成功", "完成", "重复提交", "已签到")):
+        return kind + "成功"
+    return kind + "失败"
+
+def send_notify(name: str, title: str, msg: str):
+    """按账号 notifyOption 推送签到结果。
+    method=2 走 Server酱/任意 Webhook（rcvOption 填 SendKey 或完整地址）。
+    失败静默不影响主流程。"""
+    try:
+        user, _ = read_account(name)
+        no = user.get("notifyOption") or {}
+        if int(no.get("method", 0) or 0) != 2:
+            return
+        rcv = str(no.get("rcvOption", "")).strip()
+        if not rcv:
+            return
+        # 兼容：只填 SendKey（SCT开头）时自动拼成 Server酱推送地址
+        if rcv.startswith("SCT"):
+            rcv = "https://sctapi.ftqq.com/%s.send" % rcv
+        data = urllib.parse.urlencode({"title": title, "desp": msg}).encode("utf-8")
+        req = urllib.request.Request(
+            rcv, data=data, method="POST",
+            headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except Exception as e:
+        log.info("notify skipped for %s: %s", name, e)
+
+def notify_batch(out: str, kind: str = "签到"):
+    """解析批量脚本输出，对每个账号逐条推送其结果。"""
+    names = list_accounts()
+    blocks = re.split(r"账号: (\S+)", out)
+    for i in range(1, len(blocks), 2):
+        nm = blocks[i].strip(" :")
+        if nm not in names:
+            continue
+        body = blocks[i + 1] or ""
+        result = classify(body)
+        head = notify_head(result, kind="探测" if "探测" in kind else "签到")
+        send_notify(nm, "【%s】%s" % (head, nm),
+                    "%s\n时间：%s\n\n%s" % (
+                        head, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        body.strip()[-1200:] or "(无输出)"))
+
+def run_account(name: str, dry: bool) -> str:
+    if not ENGINE_PY.exists():
+        return "引擎虚拟环境不存在: %s\n请先执行 deploy/install_windows.bat 或 deploy/install_linux.sh" % ENGINE_PY
+    yml, _ = account_paths(name)
+    try:
+        did = ensure_device_id(name)
+    except HTTPException as e:
+        return str(e.detail)
+    cmd = [str(ENGINE_PY), "-W", "ignore", str(SUBMIT_SCRIPT),
+           "--dry" if dry else "--submit",
+           "--variant", "fkey_cat", "--protocol", "ios",
+           "--config", str(yml), "--device-id", did]
+    log.info("run_account %s dry=%s: %s", name, dry, " ".join(str(x) for x in cmd))
+    return run_cmd(cmd)
+
+def batch_run(dry: bool) -> str:
+    if not ENGINE_PY.exists():
+        return "引擎虚拟环境不存在: %s" % ENGINE_PY
+    if not BATCH_SCRIPT.exists():
+        return "批量脚本不存在: %s" % BATCH_SCRIPT
+    cmd = [str(ENGINE_PY), "-W", "ignore", str(BATCH_SCRIPT),
+           "--dry" if dry else "--submit"]
+    log.info("batch_run dry=%s accounts_dir=%s", dry, ACCOUNTS_DIR)
+    return run_cmd(cmd, timeout=600)
+
+def parse_marker(out: str, marker: str):
+    for line in out.splitlines():
+        if line.startswith(marker):
+            try:
+                return json.loads(line[len(marker):].strip())
+            except Exception:
+                return None
+    return None
+
+# ---------------- 定时（线程版，触发时批量跑全部账号） ----------------
+def load_schedule():
+    st = {"enabled": DEFAULT_AUTO_SIGN, "time": DEFAULT_SIGN_TIME, "next": None}
+    if SCHED_PATH.exists():
+        try:
+            d = json.loads(SCHED_PATH.read_text(encoding="utf-8"))
+            st["enabled"] = bool(d.get("enabled", st["enabled"]))
+            st["time"] = str(d.get("time", st["time"]))
+        except Exception:
+            pass
+    return st
+
+def save_schedule(enabled: bool, time_str: str):
+    SCHED_PATH.write_text(json.dumps({"enabled": enabled, "time": time_str},
+                                     ensure_ascii=False, indent=2), encoding="utf-8")
+
+scheduler_state = load_schedule()
+_sched_wake = threading.Event()
 
 def _parse_hm(s: str):
     try:
@@ -276,7 +363,6 @@ def _parse_hm(s: str):
         raise ValueError("时间格式应为 HH:MM（如 22:05）")
 
 def _calc_next(time_str):
-    """计算下次触发时间；格式非法时返回 (None, None)。"""
     try:
         h, m = _parse_hm(time_str)
     except ValueError:
@@ -301,32 +387,21 @@ def scheduler_loop():
             st["next"] = nxt_str
             wait = (nxt - now).total_seconds()
             if wait > 60:
-                # 距触发点超过 60 秒：分段等待，随时响应时间/开关变更
                 _sched_wake.wait(timeout=60)
                 _sched_wake.clear()
                 continue
-            # 距触发点 <= 60 秒：睡到点触发（期间被唤醒则重算）
             _sched_wake.wait(timeout=max(wait, 1))
             _sched_wake.clear()
-            log.info("定时签到触发（%s）", st["time"])
-            out = run_engine(dry=False)
-            save_log("定时签到", classify(out), out)
+            log.info("定时批量签到触发（%s）", st["time"])
+            out = batch_run(dry=False)
+            save_log("定时批量签到", classify(out), out)
+            notify_batch(out, "定时签到")
         else:
             st["next"] = None
             _sched_wake.wait(timeout=30)
             _sched_wake.clear()
 
 def _start_scheduler():
-    # 启动时把 override 中的定时配置合并进来（override 优先于环境变量）
-    ov = load_override()
-    if "auto" in ov:
-        scheduler_state["enabled"] = bool(ov["auto"])
-    if "sign_time" in ov:
-        try:
-            _parse_hm(ov["sign_time"])
-            scheduler_state["time"] = ov["sign_time"]
-        except ValueError:
-            pass
     threading.Thread(target=scheduler_loop, daemon=True, name="jrxy-scheduler").start()
 
 # ---------------- FastAPI ----------------
@@ -334,33 +409,23 @@ def require_token(x_web_token: Optional[str] = Header(default=None)):
     if WEB_TOKEN and x_web_token != WEB_TOKEN:
         raise HTTPException(status_code=401, detail="未授权：缺少或错误的 X-Web-Token")
 
-app = FastAPI(title="今日校园自动签到", docs_url="/api/docs", redoc_url=None)
+app = FastAPI(title="今日校园自动签到 · 多账号管理台", docs_url="/api/docs", redoc_url=None)
 
 @app.get("/", response_class=FileResponse)
 def index():
-    # 放开静态页鉴权：页面本身不含敏感数据，需先可加载才能弹出令牌输入框
     return FileResponse(INDEX_HTML)
 
 @app.get("/school_list.js")
 def school_list_js():
-    # 同上：院校列表为公开数据，不校验令牌
     return FileResponse(STATIC_DIR / "school_list.js", media_type="application/javascript")
 
 @app.get("/api/status")
 def api_status(_t: None = Depends(require_token)):
-    e = effective_info()
-    ov = load_override()
     return {
         "platform": "Windows" if IS_WIN else "Linux",
         "engine_ready": ENGINE_PY.exists(),
-        "school": e["school"],
-        "username": mask_username(e["username"]),
-        "type": e["type"],
-        "lon": e["lon"],
-        "lat": e["lat"],
-        "address": e["address"],
-        "device_id": read_device_id() or "（未设置）",
-        "use_override": "lon" in ov or "lat" in ov or "address" in ov,
+        "accounts_dir": str(ACCOUNTS_DIR),
+        "account_count": len(list_accounts()),
         "scheduler": {
             "enabled": scheduler_state["enabled"],
             "time": scheduler_state["time"],
@@ -369,172 +434,203 @@ def api_status(_t: None = Depends(require_token)):
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-@app.get("/api/credentials")
-def api_get_credentials(_t: None = Depends(require_token)):
-    cr = load_creds()
-    u = user_config()
-    has_web = bool(cr.get("username") and cr.get("password"))
+# ---------------- 账号管理 ----------------
+@app.get("/api/accounts")
+def api_accounts(_t: None = Depends(require_token)):
+    names = list_accounts()
+    return {"accounts": [account_summary(n) for n in names]}
+
+@app.get("/api/accounts/{name}")
+def api_account_get(name: str, _t: None = Depends(require_token)):
+    user, dev = read_account(name)
+    no = user.get("notifyOption") or {}
     return {
-        "source": "web" if has_web else "config",
-        "username": mask_username(cr.get("username") or u.get("username", "")),
-        "username_set": bool(cr.get("username")),
-        "password_set": bool(cr.get("password")),
-        "note": "账号保存在本机 data/credentials.json，密码绝不回传；未在 Web 保存时使用 config.yml 兜底",
+        "name": name,
+        "schoolName": user.get("schoolName", ""),
+        "type": user.get("type", 2),
+        "httpProxy": user.get("httpProxy", ""),
+        "lon": user.get("lon"),
+        "lat": user.get("lat"),
+        "address": user.get("address", ""),
+        "abnormalReason": user.get("abnormalReason", ""),
+        "photo": user.get("photo", ""),
+        "checkTitle": user.get("checkTitle", 0),
+        "username": user.get("username", ""),
+        "username_set": bool(user.get("username")),
+        "password_set": bool(user.get("password")),
+        "device_id": dev,
+        "notify_method": int(no.get("method", 0) or 0),
+        "notify_rcv": str(no.get("rcvOption", "")).strip(),
     }
 
-@app.post("/api/credentials")
-def api_set_credentials(body: dict, _t: None = Depends(require_token)):
-    username = str(body.get("username", "")).strip()
-    password = str(body.get("password", ""))
-    if username and not password:
-        raise HTTPException(status_code=400, detail="已填写学号，密码不能为空")
-    if password and not username:
-        raise HTTPException(status_code=400, detail="已填写密码，学号不能为空")
-    save_creds(username, password)
-    save_log("账号设置", "账号已通过 Web 保存" if username else "账号已清除",
-             "username=%s" % (mask_username(username) or "(空)"))
-    return {"ok": True, "source": "web" if (username and password) else "config",
-            "username": mask_username(username)}
-
-@app.get("/api/settings")
-def api_get_settings(_t: None = Depends(require_token)):
-    """返回 config.yml 全部用户级设置（密码只返回是否已设置）。"""
-    u = user_config()
-    cfg = load_engine_config()
-    return {
-        "schoolName": u.get("schoolName", ""),
-        "type": u.get("type", 2),
-        "httpProxy": cfg.get("httpProxy", ""),
-        "lon": u.get("lon"),
-        "lat": u.get("lat"),
-        "address": u.get("address", ""),
-        "abnormalReason": u.get("abnormalReason", ""),
-        "photo": u.get("photo", ""),
-        "checkTitle": u.get("checkTitle", 0),
-        "username": mask_username(u.get("username", "")),
-        "password_set": bool(u.get("password")),
-    }
-
-@app.post("/api/settings")
-def api_set_settings(body: dict, _t: None = Depends(require_token)):
-    """保存 config.yml 全部用户级设置；账号/密码留空则保持原值；坐标与账号同步覆盖层。"""
-    cfg = load_engine_config()
-    u = cfg["users"][0]["user"]
-
-    schoolName = str(body.get("schoolName", "")).strip()
-    if not schoolName:
-        schoolName = u.get("schoolName", "")  # 留空 = 保持原值（引擎登录/提交依赖，禁止清空）
-
+def build_user_from_body(body: dict, existing: dict = None) -> dict:
+    """构造/合并 user 字典；existing 为空表示新建（必填 schoolName/username/password）。"""
+    cur = dict(existing or {})
+    schoolName = str(body.get("schoolName", "")).strip() or cur.get("schoolName", "")
+    username = str(body.get("username", "")).strip() or cur.get("username", "")
+    password = str(body.get("password", "")) or cur.get("password", "")
+    if not existing and not (schoolName and username and password):
+        raise HTTPException(status_code=400,
+                            detail="新建账号必须填写：学校名称 / 学号 / 密码")
     try:
-        typ = int(body.get("type", u.get("type", 2)))
+        typ = int(body.get("type", cur.get("type", 2)))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="任务类型必须是 0~4 的整数")
     if typ not in (0, 1, 2, 3, 4):
         raise HTTPException(status_code=400, detail="任务类型仅支持 0收集/1签到/2查寝/3政工/4日志")
-
-    lon, lat = body.get("lon"), body.get("lat")
-    try:
-        lon = float(lon) if lon is not None and str(lon).strip() != "" else u.get("lon")
-        lat = float(lat) if lat is not None and str(lat).strip() != "" else u.get("lat")
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="经度/纬度必须是数字")
+    lon = normalize_optional_num(body.get("lon"), cur.get("lon"))
+    lat = normalize_optional_num(body.get("lat"), cur.get("lat"))
     if lon is not None and not (-180 <= lon <= 180):
         raise HTTPException(status_code=400, detail="经度范围 -180 ~ 180")
     if lat is not None and not (-90 <= lat <= 90):
         raise HTTPException(status_code=400, detail="纬度范围 -90 ~ 90")
-
-    httpProxy = str(body.get("httpProxy", cfg.get("httpProxy", ""))).strip()
-    address = str(body.get("address", u.get("address", ""))).strip()
-    abnormalReason = str(body.get("abnormalReason", u.get("abnormalReason", ""))).strip()
-    photo = str(body.get("photo", u.get("photo", ""))).strip()
     try:
-        checkTitle = int(body.get("checkTitle", u.get("checkTitle", 0)) or 0)
+        checkTitle = int(body.get("checkTitle", cur.get("checkTitle", 0)) or 0)
     except (TypeError, ValueError):
         checkTitle = 0
-
-    # 账号：用户名非空才更新；密码留空则保持原密码
-    username = str(body.get("username", "")).strip()
-    password = str(body.get("password", ""))
-    if username:
-        u["username"] = username
-        u["password"] = password if password else u.get("password", "")
-
-    u["schoolName"] = schoolName
-    u["type"] = typ
-    u["lon"] = lon
-    u["lat"] = lat
-    u["address"] = address
-    u["abnormalReason"] = abnormalReason
-    u["photo"] = photo
-    u["checkTitle"] = checkTitle
-    cfg["httpProxy"] = httpProxy
-
-    with open(ENGINE_DIR / "config.yml", "w", encoding="utf-8") as f:
-        yaml.dump(cfg, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
-
-    # 同步覆盖层，保持运行时优先级一致（Web 账号优先、坐标覆盖优先）
-    ov = load_override()
-    if lon is not None and lat is not None and address:
-        ov["lon"], ov["lat"], ov["address"] = lon, lat, address
-        save_override(ov)
-    if username and password:
-        save_creds(username, password)
-
-    save_log("个人设置", "引擎配置已保存",
-             "school=%s type=%s proxy=%s" % (schoolName, typ, httpProxy or "(无)"))
-    return {"ok": True, "config": {
-        "schoolName": schoolName, "type": typ, "httpProxy": httpProxy,
-        "lon": lon, "lat": lat, "address": address,
-        "abnormalReason": abnormalReason, "photo": photo, "checkTitle": checkTitle,
-        "username": mask_username(u.get("username", "")), "password_set": bool(u.get("password"))}}
-
-@app.post("/api/test-login")
-def api_test_login(_t: None = Depends(require_token)):
-    """登录连通性测试：仅执行 CAS 登录，不查询任务、不提交签到。"""
-    if not ENGINE_PY.exists():
-        raise HTTPException(status_code=500, detail="引擎虚拟环境不存在: %s" % ENGINE_PY)
-    if not TESTLOGIN_SCRIPT.exists():
-        raise HTTPException(status_code=500, detail="引擎脚本不存在: %s" % TESTLOGIN_SCRIPT)
-    cmd = [str(ENGINE_PY), "-W", "ignore", str(TESTLOGIN_SCRIPT)]
-    env = dict(os.environ)
-    env.update(creds_env())   # Web 保存的账号密码优先，无则回退 config.yml
+    # 消息推送：method 0=禁用 2=Server酱/任意Webhook（rcvOption 填推送地址）
+    cur_no = cur.get("notifyOption") or {}
+    if not isinstance(cur_no, dict):
+        cur_no = {}
     try:
-        r = subprocess.run(cmd, cwd=str(ENGINE_DIR), capture_output=True, text=True,
-                           timeout=60, encoding="utf-8", errors="replace", env=env)
-    except subprocess.TimeoutExpired:
-        save_log("登录测试", "测试超时", "执行超时（60 秒）")
-        raise HTTPException(status_code=504, detail="登录测试超时（60 秒）")
-    except Exception as e:
-        save_log("登录测试", "测试异常", str(e)[:200])
-        raise HTTPException(status_code=500, detail="登录测试异常: %s" % e)
-    payload = None
-    for line in (r.stdout or "").splitlines():
-        if line.startswith("###LOGIN###"):
-            try:
-                payload = json.loads(line[len("###LOGIN###"):].strip())
-            except Exception:
-                payload = None
-            break
+        n_method = int(body.get("notifyMethod", cur_no.get("method", 0)) or 0)
+    except (TypeError, ValueError):
+        n_method = 0
+    if n_method not in (0, 1, 2):
+        n_method = 0
+    notify = {
+        "method": n_method,
+        "rcvOption": str(body.get("notifyRcv", cur_no.get("rcvOption", ""))).strip(),
+    }
+    user = {
+        "type": typ,
+        "schoolName": schoolName,
+        "username": username,
+        "password": password,
+        "address": str(body.get("address", cur.get("address", ""))).strip(),
+        "lon": lon,
+        "lat": lat,
+        "abnormalReason": str(body.get("abnormalReason", cur.get("abnormalReason", ""))).strip(),
+        "photo": str(body.get("photo", cur.get("photo", ""))).strip(),
+        "checkTitle": checkTitle,
+        "notifyOption": notify,
+    }
+    return user, str(body.get("httpProxy", "")).strip()
+
+@app.post("/api/accounts")
+def api_account_create(body: dict, _t: None = Depends(require_token)):
+    name = str(body.get("name", "")).strip()
+    if not valid_account_name(name):
+        raise HTTPException(status_code=400,
+                            detail="账号名需为 1~32 位中英文/数字/_- 且不能以 _ 开头")
+    yml, did_file = account_paths(name)
+    if yml.exists():
+        raise HTTPException(status_code=400, detail=f"账号 {name} 已存在")
+    user, proxy = build_user_from_body(body)
+    write_account(name, user, proxy)
+    dev = str(body.get("deviceId", "")).strip()
+    if dev:
+        did_file.write_text(dev, encoding="utf-8")
+    save_log("账号管理", "账号已创建", "name=%s school=%s" % (name, user["schoolName"]))
+    return {"ok": True, "account": account_summary(name),
+            "note": ("已写入固定 deviceId" if dev else "deviceId 未设置，首次运行自动生成")}
+
+@app.post("/api/accounts/{name}")
+def api_account_update(name: str, body: dict, _t: None = Depends(require_token)):
+    user, dev = read_account(name)
+    new_user, proxy = build_user_from_body(body, existing=user)
+    # 密码留空 = 保持原密码（build_user_from_body 已处理）；账号留空同理
+    write_account(name, new_user, proxy)
+    dev_new = str(body.get("deviceId", "")).strip()
+    if dev_new:
+        _, did_file = account_paths(name)
+        did_file.write_text(dev_new, encoding="utf-8")
+    save_log("账号管理", "账号已更新", "name=%s school=%s" % (name, new_user["schoolName"]))
+    return {"ok": True, "account": account_summary(name)}
+
+@app.delete("/api/accounts/{name}")
+def api_account_delete(name: str, _t: None = Depends(require_token)):
+    read_account(name)   # 校验存在
+    yml, did_file = account_paths(name)
+    yml.unlink(missing_ok=True)
+    # deviceId 文件保留（若账号重新接入，可沿用原绑定；文件不随 yml 被批量脚本扫描）
+    save_log("账号管理", "账号已删除", "name=%s（deviceId 文件保留以防误删绑定）" % name)
+    return {"ok": True, "note": "已删除账号配置；deviceId 文件已保留（重新接入可沿用原绑定）"}
+
+# ---------------- 账号操作：探测/签到/登录测试/签到范围/照片 ----------------
+@app.post("/api/accounts/{name}/run")
+def api_account_run(name: str, body: dict, _t: None = Depends(require_token)):
+    mode = str(body.get("mode", "dry"))
+    if mode not in ("dry", "submit"):
+        raise HTTPException(status_code=400, detail="mode 仅支持 dry / submit")
+    read_account(name)
+    kind = f"账号[{name}] {'探测' if mode == 'dry' else '签到'}"
+    out = run_account(name, dry=(mode == "dry"))
+    result = classify(out)
+    save_log(kind, result, out)
+    # 探测与签到都推送（头部状态化：探测成功/探测失败/查寝未开始/无任务待签）
+    head = notify_head(result, kind="探测" if mode == "dry" else "签到")
+    send_notify(name, "【%s】%s" % (head, name),
+                "%s\n时间：%s\n\n%s" % (
+                    head, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    out.strip()[-1200:] or "(无输出)"))
+    return {"ok": True, "result": result, "detail": out[-4000:]}
+
+@app.post("/api/accounts/{name}/test-login")
+def api_account_test_login(name: str, _t: None = Depends(require_token)):
+    read_account(name)
+    if not ENGINE_PY.exists():
+        raise HTTPException(status_code=500, detail="引擎虚拟环境不存在")
+    if not TESTLOGIN_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail="引擎脚本不存在")
+    yml, _ = account_paths(name)
+    cmd = [str(ENGINE_PY), "-W", "ignore", str(TESTLOGIN_SCRIPT), "--config", str(yml)]
+    out = run_cmd(cmd, timeout=60)
+    payload = parse_marker(out, "###LOGIN###")
     if not payload:
-        err = (r.stderr or r.stdout or "").strip()[-300:]
-        save_log("登录测试", "测试失败", err[:200])
-        raise HTTPException(status_code=502, detail="无法解析结果: %s" % err)
+        save_log(f"账号[{name}] 登录测试", "测试失败", (out or "")[-300:])
+        raise HTTPException(status_code=502, detail="无法解析结果: %s" % (out[-300:] or "无输出"))
     if payload.get("ok"):
-        save_log("登录测试", "登录成功",
+        save_log(f"账号[{name}] 登录测试", "登录成功",
                  "host=%s cookies=%s" % (payload.get("host"), ",".join(payload.get("cookies") or [])))
     else:
-        save_log("登录测试", "登录失败", str(payload.get("error"))[:200])
+        save_log(f"账号[{name}] 登录测试", "登录失败", str(payload.get("error"))[:200])
     return {"ok": bool(payload.get("ok")), "host": payload.get("host", ""),
             "cookies": payload.get("cookies", []), "error": payload.get("error")}
 
-@app.post("/api/photo")
-def api_photo(body: dict, _t: None = Depends(require_token)):
-    """上传签到照片：保存到引擎根目录，photo 字段写入相对文件名。"""
-    name = os.path.basename(str(body.get("name", "")).strip())
+@app.post("/api/accounts/{name}/sign-range")
+def api_account_sign_range(name: str, _t: None = Depends(require_token)):
+    user, _ = read_account(name)
+    if not ENGINE_PY.exists():
+        raise HTTPException(status_code=500, detail="引擎虚拟环境不存在")
+    if not RANGE_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail="引擎脚本不存在")
+    yml, _ = account_paths(name)
+    cmd = [str(ENGINE_PY), "-W", "ignore", str(RANGE_SCRIPT), "--config", str(yml)]
+    out = run_cmd(cmd, timeout=120)
+    payload = parse_marker(out, "###RANGE###")
+    if not payload or not payload.get("ok"):
+        err = (payload or {}).get("error") or (out[-300:] or "无输出")
+        save_log(f"账号[{name}] 范围获取", "获取失败", str(err)[:200])
+        raise HTTPException(status_code=502, detail="获取失败: %s" % err)
+    lon, lat = float(payload["lon"]), float(payload["lat"])
+    user["lon"], user["lat"] = lon, lat
+    user["address"] = payload.get("address") or user.get("address", "")
+    write_account(name, user)
+    detail = "center=(%.8f, %.8f) radius=%sm %s 窗口 %s~%s" % (
+        lon, lat, payload.get("radius"), payload.get("taskName", ""),
+        payload.get("window_begin", ""), payload.get("window_end", ""))
+    save_log(f"账号[{name}] 范围获取", "签到范围已获取并应用", detail)
+    return {"ok": True, "range": payload, "account": account_summary(name)}
+
+@app.post("/api/accounts/{name}/photo")
+def api_account_photo(name: str, body: dict, _t: None = Depends(require_token)):
+    user, _ = read_account(name)
+    fname = os.path.basename(str(body.get("name", "")).strip())
     data = str(body.get("data", ""))
-    if not name or not data:
+    if not fname or not data:
         raise HTTPException(status_code=400, detail="缺少文件名或图片数据")
-    if not name.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
+    if not fname.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
         raise HTTPException(status_code=400, detail="仅支持 jpg/png/webp/gif 图片")
     try:
         raw = base64.b64decode(data.split(",")[-1])
@@ -544,80 +640,31 @@ def api_photo(body: dict, _t: None = Depends(require_token)):
         raise HTTPException(status_code=400, detail="图片内容为空")
     if len(raw) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="图片不能超过 5MB")
-    target = ENGINE_DIR / name
+    adir = ACCOUNTS_DIR / name
+    adir.mkdir(parents=True, exist_ok=True)
+    target = adir / fname
     target.write_bytes(raw)
-    save_log("照片上传", "签到照片已上传", "file=%s size=%dB" % (name, len(raw)))
-    return {"ok": True, "photo": name, "size": len(raw)}
+    # 引擎按 jrxy-engine/ 根目录解析 photo；accounts 在项目根，故用 ../accounts/<name>/<file>
+    user["photo"] = "../accounts/%s/%s" % (name, fname)
+    write_account(name, user)
+    save_log(f"账号[{name}] 照片", "签到照片已上传", "file=%s size=%dB" % (fname, len(raw)))
+    return {"ok": True, "photo": user["photo"], "size": len(raw)}
 
-@app.post("/api/logs/clear")
-def api_logs_clear(_t: None = Depends(require_token)):
-    """清空运行日志（Web 手动清除）。"""
-    clear_logs()
-    save_log("日志管理", "日志已清空", "由 Web 页面手动清除")
-    return {"ok": True}
-
-@app.post("/api/config")
-def api_config(body: dict, _t: None = Depends(require_token)):
-    lon, lat = body.get("lon"), body.get("lat")
-    address = str(body.get("address", "")).strip()
-    try:
-        lon = float(lon) if lon is not None and str(lon).strip() != "" else None
-        lat = float(lat) if lat is not None and str(lat).strip() != "" else None
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="经度/纬度必须是数字（保留 6 位小数）")
-    if lon is not None and not (-180 <= lon <= 180):
-        raise HTTPException(status_code=400, detail="经度范围 -180 ~ 180")
-    if lat is not None and not (-90 <= lat <= 90):
-        raise HTTPException(status_code=400, detail="纬度范围 -90 ~ 90")
-    ov = load_override()
-    ov["lon"], ov["lat"], ov["address"] = lon, lat, address
-    save_override(ov)
-    save_log("配置更新", "坐标/地址已更新",
-             "lon=%s lat=%s address=%s" % (lon, lat, address))
-    return {"ok": True, "effective": effective_info()}
-
-@app.post("/api/sign-range")
-def api_sign_range(_t: None = Depends(require_token)):
-    """从服务端任务详情拉取签到范围（signPlaceSelected：中心点+半径），
-    并直接写入 data/override.json 作为签到地址立即生效。"""
-    if not ENGINE_PY.exists():
-        raise HTTPException(status_code=500, detail="引擎虚拟环境不存在: %s" % ENGINE_PY)
-    if not RANGE_SCRIPT.exists():
-        raise HTTPException(status_code=500, detail="引擎脚本不存在: %s" % RANGE_SCRIPT)
-    cmd = [str(ENGINE_PY), "-W", "ignore", str(RANGE_SCRIPT)]
-    env = dict(os.environ)
-    env.update(creds_env())   # Web 保存的账号密码优先，无则回退 config.yml
-    try:
-        r = subprocess.run(cmd, cwd=str(ENGINE_DIR), capture_output=True, text=True,
-                           timeout=120, encoding="utf-8", errors="replace", env=env)
-    except subprocess.TimeoutExpired:
-        save_log("范围获取", "获取失败", "执行超时（120 秒）")
-        raise HTTPException(status_code=504, detail="获取签到范围超时（120 秒）")
-    except Exception as e:
-        save_log("范围获取", "获取失败", str(e)[:200])
-        raise HTTPException(status_code=500, detail="获取签到范围异常: %s" % e)
-    payload = None
-    for line in (r.stdout or "").splitlines():
-        if line.startswith("###RANGE###"):
-            try:
-                payload = json.loads(line[len("###RANGE###"):].strip())
-            except Exception:
-                payload = None
-            break
-    if not payload or not payload.get("ok"):
-        err = (payload or {}).get("error") or ((r.stderr or r.stdout or "").strip()[-300:])
-        save_log("范围获取", "获取失败", str(err)[:200])
-        raise HTTPException(status_code=502, detail="获取失败: %s" % err)
-    lon, lat = float(payload["lon"]), float(payload["lat"])
-    ov = load_override()
-    ov["lon"], ov["lat"], ov["address"] = lon, lat, payload.get("address") or ov.get("address", "")
-    save_override(ov)
-    detail = "center=(%.8f, %.8f) radius=%sm %s 窗口 %s~%s" % (
-        lon, lat, payload.get("radius"), payload.get("taskName", ""),
-        payload.get("window_begin", ""), payload.get("window_end", ""))
-    save_log("范围获取", "签到范围已获取并应用", detail)
-    return {"ok": True, "range": payload,
-            "note": "已写入 data/override.json：坐标与地址更新为服务端签到范围中心点（半径 %sm）" % payload.get("radius")}
+# ---------------- 批量运行 / 定时 / 日志 ----------------
+@app.post("/api/batch-run")
+def api_batch_run(body: dict, _t: None = Depends(require_token)):
+    mode = str(body.get("mode", "dry"))
+    if mode not in ("dry", "submit"):
+        raise HTTPException(status_code=400, detail="mode 仅支持 dry / submit")
+    kind = "批量探测" if mode == "dry" else "批量签到"
+    out = batch_run(dry=(mode == "dry"))
+    result = classify(out)
+    if "批量完成" in out:
+        result = out.split("批量完成", 1)[1].strip().splitlines()[0].strip()
+    save_log(kind, result, out)
+    # 批量探测与批量签到都推送（逐账号，头部状态化）
+    notify_batch(out, kind)
+    return {"ok": True, "result": result, "detail": out[-4000:]}
 
 @app.post("/api/schedule")
 def api_schedule(body: dict, _t: None = Depends(require_token)):
@@ -629,33 +676,23 @@ def api_schedule(body: dict, _t: None = Depends(require_token)):
         raise HTTPException(status_code=400, detail=str(e))
     scheduler_state["enabled"] = enabled
     scheduler_state["time"] = t
-    _, nxt_str = _calc_next(t)          # 立即重算下次执行时间并返回
+    _, nxt_str = _calc_next(t)
     scheduler_state["next"] = nxt_str
-    ov = load_override()
-    ov["auto"] = enabled
-    ov["sign_time"] = t
-    save_override(ov)
-    save_log("定时更新", "定时签到设置已更新",
-             "enabled=%s time=%s" % (enabled, t))
-    _sched_wake.set()   # 唤醒调度线程，按新配置重新等待
-    return {"ok": True, "scheduler": {
-        "enabled": enabled, "time": t, "next": nxt_str}}
-
-@app.post("/api/run")
-def api_run(body: dict, _t: None = Depends(require_token)):
-    mode = str(body.get("mode", "dry"))
-    if mode not in ("dry", "submit"):
-        raise HTTPException(status_code=400, detail="mode 仅支持 dry / submit")
-    kind = "手动探测" if mode == "dry" else "手动签到"
-    out = run_engine(dry=(mode == "dry"))
-    result = classify(out)
-    save_log(kind, result, out)
-    return {"ok": True, "result": result, "detail": out[-4000:]}
+    save_schedule(enabled, t)
+    save_log("定时更新", "定时批量签到设置已更新", "enabled=%s time=%s" % (enabled, t))
+    _sched_wake.set()
+    return {"ok": True, "scheduler": {"enabled": enabled, "time": t, "next": nxt_str}}
 
 @app.get("/api/logs")
 def api_logs(limit: int = 50, _t: None = Depends(require_token)):
     limit = max(1, min(limit, 200))
     return {"logs": fetch_logs(limit)}
+
+@app.post("/api/logs/clear")
+def api_logs_clear(_t: None = Depends(require_token)):
+    clear_logs()
+    save_log("日志管理", "日志已清空", "由 Web 页面手动清除")
+    return {"ok": True}
 
 # ---------------- 启动 ----------------
 init_db()

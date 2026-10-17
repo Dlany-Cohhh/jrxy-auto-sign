@@ -6,6 +6,9 @@ jrxy-engine/*.log
 jrxy-engine/aes_test*.txt
 *.log
 
+# ===== 多账号批量（每账号配置/设备ID，严禁提交）=====
+accounts/
+
 # ===== 虚拟环境 / 运行时数据 =====
 .venv/
 venv/

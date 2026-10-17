@@ -24,8 +24,14 @@ from actions.autoSign import AutoSign
 
 
 def main():
-    conf = yaml.safe_load(open(os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "config.yml"), encoding="utf-8"))
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", default=None,
+                    help="指定账号配置文件路径（默认 jrxy-engine/config.yml；多账号由 Web/batch 传入）")
+    args = ap.parse_args()
+    conf_path = args.config or os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "config.yml")
+    conf = yaml.safe_load(open(conf_path, encoding="utf-8"))
     user = conf["users"][0]["user"]
     # Web 页面保存的账号密码优先（环境变量传入）；两个变量必须同时存在才生效。
     if os.getenv("JRXY_USERNAME") and os.getenv("JRXY_PASSWORD"):

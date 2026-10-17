@@ -16,6 +16,9 @@
   # 指定密钥派生候选（默认自动按顺序试到成功）
   python scripts/merged_ios_v4_submit.py --submit --variant fkey_cat
 
+  # 指定账号配置文件（多账号批量场景，配合固定 --device-id 使用）
+  python scripts/merged_ios_v4_submit.py --submit --config ../accounts/alice.yml --device-id <固定ID>
+
 ⚠️ 风控提示：服务端会校验“账号↔设备”绑定。请用本人真实设备 deviceId，
    并尽量低频测试。触发“更换手机频繁/设备未授权”后需管理员解绑。
 """
@@ -394,10 +397,14 @@ def main():
     ap.add_argument("--sign-mode", choices=["hash", "switch", "none"], default="hash",
                     help="sign 字段：hash(md5) / switch(=1) / none(不带)")
     ap.add_argument("--userid", default=None, help="覆盖提交体 userId（默认=学号；可传空串）")
+    ap.add_argument("--config", default=None,
+                    help="指定账号配置文件路径（默认 jrxy-engine/config.yml；多账号批量由 batch_submit.py 传入）")
     args = ap.parse_args()
 
-    conf = yaml.safe_load(open(os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "config.yml"), encoding="utf-8"))
+    # 账号配置文件：--config 优先（多账号批量场景），否则回退引擎根目录 config.yml。
+    conf_path = args.config or os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "config.yml")
+    conf = yaml.safe_load(open(conf_path, encoding="utf-8"))
     user = conf["users"][0]["user"]
     # Web 页面保存的账号密码优先（环境变量传入）；未设置时回退 config.yml。
     # 两个变量必须同时存在才生效，避免“账号/密码”错配。

@@ -5,6 +5,9 @@
 账号设置、内置定时、运行日志）。
 
 > 详细部署步骤、Linux 自检清单与常见问题见 [`README-部署手册.md`](README-部署手册.md)。
+>
+> **多账号批量签到**（一台服务器跑多个账号，每账号独立 deviceId，无需 Docker）见
+> [`README-多账号批量部署.md`](README-多账号批量部署.md)。
 
 ---
 
@@ -18,12 +21,13 @@
   - 任务类型：0 收集 / 1 签到 / 2 查寝 / 3 政工签到 / 4 教师工作日志
 
 - **Web 管理台**
-  - 状态概览（学校、账号掩码、任务类型、设备 ID、坐标、定时状态）
-  - 手动操作：**只探测**（登录+查任务+构造提交体，无副作用）/ **立即签到**（真实提交）
-  - **账号设置**：学号/密码通过页面保存到本机 `data/credentials.json`，密码绝不回传
-  - **地图选点**：高德瓦片（GCJ-02 与今日校园同坐标系），不可达时自动回退 OpenStreetMap 并换算
-  - 坐标/地址/定时均可在页面修改，立即生效（`data/override.json`）
+  - **多账号管理**：账号列表 / 新增 / 编辑 / 删除，账号数据源 = `accounts/` 目录（与批量脚本 `batch_submit.py` 共用）
+  - 每账号独立 **deviceId**（可粘贴原绑定 ID 迁移，也可首次运行自动生成），密码绝不回传
+  - 单账号操作：**只探测**（登录+查任务+构造提交体，无副作用）/ **立即签到**（真实提交）/ **登录测试**
+  - 批量操作：一键探测全部 / 签到全部；内置定时每天批量签到全部账号
+  - 从服务器获取签到范围（中心点 + 半径自动写入该账号坐标）
   - 运行日志：SQLite 持久化，Web 端查看最近 200 条
+  - **签到结果推送**：按账号独立配置（Server酱 SendKey / 任意 Webhook），手动/批量/定时签到与探测都会推送，通知头部直接标注「签到成功 / 签到失败 / 查寝未开始 / 无任务待签」
 
 - **部署形态**
   - Windows：一键 `install_windows.bat` / `start_windows.bat`
@@ -75,6 +79,10 @@ cp jrxy-engine/config.example.yml jrxy-engine/config.yml
 固定设备 ID：引擎首次运行会生成并保存 `.device_id`，**勿删除/更换**（账号与设备绑定，
 更换会触发"疑似更换手机频繁"风控）。
 
+> **多账号**：直接通过 Web 管理台「新增账号」，或复制 `accounts/_example.yml` 创建
+> `accounts/<账号名>.yml`（学号/密码/坐标/地址），每个账号独立 deviceId（可粘贴原绑定 ID 迁移，
+> 也可首次运行自动生成）。详见 [`README-多账号批量部署.md`](README-多账号批量部署.md)。
+
 ### 2. 部署
 
 **Windows：**
@@ -101,44 +109,51 @@ docker compose up -d --build
 ### 3. 命令行直跑引擎（不经 Web）
 
 ```bash
-# 只探测（无副作用）：登录 + 查任务 + 构造提交体
+# 多账号（推荐）：批量脚本，遍历 accounts/*.yml，deviceId 自动生成或沿用已有绑定
 cd jrxy-engine
-.venv/bin/python -W ignore scripts/dryrun_query_tasks.py
+.venv/bin/python -W ignore scripts/batch_submit.py --list      # 查看账号与设备状态
+.venv/bin/python -W ignore scripts/batch_submit.py --dry       # 只探测全部（无副作用）
+.venv/bin/python -W ignore scripts/batch_submit.py --submit    # 真实提交全部
 
-# 真实提交（会完成一次查寝签到）
+# 单账号直跑（--config 指定账号配置文件；不传则回退 config.yml 单账号模式）
 .venv/bin/python -W ignore scripts/merged_ios_v4_submit.py --submit \
-  --variant fkey_cat --protocol ios --device-id <固定deviceId> \
-  --lon <经度> --lat <纬度> --address "签到点地址"
+  --config ../accounts/某账号.yml --variant fkey_cat --protocol ios
 ```
 
-## Web 管理台 API
+## Web 管理台 API（多账号版）
 
-| 接口 | 说明 |
-|---|---|
-| `GET /api/status` | 状态概览（账号为掩码） |
-| `GET /api/credentials` | 账号保存状态（掩码，密码绝不回传） |
-| `POST /api/credentials` | 保存/清除学号密码（`{"username","password"}`，同时为空=清除） |
-| `POST /api/config` | 保存坐标/地址 |
-| `POST /api/schedule` | 保存定时设置 |
-| `POST /api/run` | 运行引擎：`{"mode":"dry"}` 探测 / `{"mode":"submit"}` 真实签到 |
-| `GET /api/logs` | 运行日志（SQLite） |
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/status` | 平台 / 引擎就绪 / 账号数 / 定时状态 |
+| GET/POST | `/api/accounts` | 账号列表 / 新建账号 |
+| GET/POST/DELETE | `/api/accounts/{name}` | 账号详情 / 更新 / 删除 |
+| POST | `/api/accounts/{name}/run` | 单账号 dry 探测 / submit 签到 |
+| POST | `/api/accounts/{name}/test-login` | 单账号登录连通测试 |
+| POST | `/api/accounts/{name}/sign-range` | 获取并写入该账号签到范围 |
+| POST | `/api/accounts/{name}/photo` | 上传该账号签到照片 |
+| POST | `/api/batch-run` | 批量探测 / 签到全部账号 |
+| POST | `/api/schedule` | 内置定时开关与时间 |
+| GET/POST | `/api/logs`、`/api/logs/clear` | 运行日志（SQLite） |
 
 环境变量：`HOST`（默认 127.0.0.1）、`PORT`（默认 8000）、`WEB_TOKEN`（可选，设置后所有接口需
-请求头 `X-Web-Token`）、`SIGN_TIME`（内置定时，默认 22:05）、`AUTO_SIGN`（1 启用/0 停用）。
+请求头 `X-Web-Token`）、`SIGN_TIME`（内置定时，默认 22:05）、`AUTO_SIGN`（1 启用/0 停用）、
+`JRXY_ACCOUNTS_DIR`（账号目录，默认项目根 `accounts/`）。
 
-账号密码优先级：**Web「账号设置」保存的账号 > `config.yml`**。Web 触发引擎时通过环境变量
-`JRXY_USERNAME` / `JRXY_PASSWORD` 注入；豆包定时任务等直连引擎的场景仍以 `config.yml` 兜底。
+账号数据源唯一：Web 管理台与批量脚本共用 `accounts/<账号名>.yml` + `<账号名>.device_id`；
+密码写入账号 yml 且**永不通过接口回传**。旧的 `config.yml`（单账号）仍被引擎脚本兼容兜底。
 
 ## 定时签到
 
-- **内置定时**：Web 服务自带线程定时器（默认每天 22:05），部署到服务器后自足运行；
-- **豆包定时任务**：本机可另配置每日 22:05 直跑引擎；
-- 两者同时开启无害（重复提交会被服务端判为"已签到/重复"，日志正常记录）。
+- **内置定时**：Web 服务自带线程定时器（默认每天 22:05，可在页面或 `SIGN_TIME` 调整），
+  到点自动**批量签到全部账号**，部署到服务器后自足运行；
+- **crontab 直跑**（不开 Web 的小服务器）：`batch_submit.py --submit` 挂 cron，与内置定时**二选一**；
+- 重复提交会被服务端判为"已签到/重复"，日志正常记录，不会重复签到。
 
 ## 安全说明
 
-- `config.yml`、`web-server/data/credentials.json`、`.device_id` 均被 `.gitignore` 排除，
-  **不会进入 Git 仓库**（仓库内仅有 `config.example.yml` 占位模板）；
+- `accounts/`（学号/密码/deviceId）、`web-server/data/`（日志/定时）、`.venv`、引擎
+  `config.yml` 与 `.device_id` 均被 `.gitignore` 排除，**不会进入 Git 仓库**
+  （仓库内仅有 `accounts/_example.yml` 占位模板）；
 - 界面与接口**永不返回密码**；
 - 默认仅监听 `127.0.0.1`；对外部署务必设置 `WEB_TOKEN` + HTTPS/反向代理；
 - 请遵守学校/校园平台的使用规则，合理控制调用频率，触发风控后需管理员解绑。
